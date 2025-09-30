@@ -1,0 +1,14 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: v4.4.0
+_src_path: https://github.com/jupyterlab/extension-template
+author_email: test@test.com
+author_name: code_stream
+has_binder: false
+has_settings: true
+kind: frontend-and-server
+labextension_name: code_stream
+project_short_description: A jupyter extension to sync notebooks.
+python_name: code_stream
+repository: https://github.com/RETR0-OS/code_stream.git
+test: false
+

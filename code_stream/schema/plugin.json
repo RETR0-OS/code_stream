@@ -1,0 +1,8 @@
+{
+  "jupyter.lab.shortcuts": [],
+  "title": "code_stream",
+  "description": "code_stream settings.",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
