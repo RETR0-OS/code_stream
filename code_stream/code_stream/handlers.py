@@ -8,11 +8,13 @@ class RouteHandler(APIHandler):
     # The following decorator should be present on all verb methods (head, get, post,
     # patch, put, delete, options) to ensure only authorized user can request the
     # Jupyter server
-    @tornado.web.authenticated
+    # @tornado.web.authenticated
     def get(self):
         self.finish(json.dumps({
             "data": "This is /code-stream/get-example endpoint!"
         }))
+
+
 
 
 def setup_handlers(web_app):
