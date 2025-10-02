@@ -4,6 +4,9 @@ from jupyter_server.base.handlers import APIHandler
 from jupyter_server.utils import url_path_join
 import tornado
 
+from .redis_views import PushCellHandler, GetCellHandler, UpdateCellHandler, DeleteCellHandler
+
+
 class RouteHandler(APIHandler):
     # The following decorator should be present on all verb methods (head, get, post,
     # patch, put, delete, options) to ensure only authorized user can request the
@@ -20,7 +23,18 @@ class RouteHandler(APIHandler):
 def setup_handlers(web_app):
     host_pattern = ".*$"
 
+    add_cell = r"/code_stream/([a-zA-Z0-9]{6})/push-cell/"
+    get_cell = r"/code_stream/([a-zA-Z0-9]{6})/get-cell/"
+    update_cell = r"/code_stream/([a-zA-Z0-9]{6})/update/"
+    delete_cell = r"/code_stream/([a-zA-Z0-9]{6})/delete/"
+
     base_url = web_app.settings["base_url"]
     route_pattern = url_path_join(base_url, "code-stream", "get-example")
-    handlers = [(route_pattern, RouteHandler)]
+    handlers = [(
+        route_pattern, RouteHandler,
+        add_cell, PushCellHandler,
+        get_cell, GetCellHandler,
+        update_cell, UpdateCellHandler,
+        delete_cell, DeleteCellHandler,
+    )]
     web_app.add_handlers(host_pattern, handlers)
