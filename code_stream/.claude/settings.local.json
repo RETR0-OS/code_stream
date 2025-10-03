@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(jlpm install:*)",
+      "Bash(jlpm build:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
