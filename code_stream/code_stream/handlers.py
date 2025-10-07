@@ -25,9 +25,9 @@ def setup_handlers(web_app):
     base_url = web_app.settings["base_url"]
 
     add_cell = url_path_join(base_url, r"/code_stream/([a-zA-Z0-9]{6})/push-cell/")
-    get_cell = url_path_join(r"/code_stream/([a-zA-Z0-9]{6})/get-cell/")
-    update_cell = url_path_join(r"/code_stream/([a-zA-Z0-9]{6})/update/")
-    delete_cell = url_path_join(r"/code_stream/([a-zA-Z0-9]{6})/delete/")
+    get_cell = url_path_join(base_url, r"/code_stream/([a-zA-Z0-9]{6})/get-cell/")
+    update_cell = url_path_join(base_url, r"/code_stream/([a-zA-Z0-9]{6})/update/")
+    delete_cell = url_path_join(base_url, r"/code_stream/([a-zA-Z0-9]{6})/delete/")
 
     
     route_pattern = url_path_join(base_url, "code-stream", "get-example")

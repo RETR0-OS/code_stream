@@ -27,8 +27,9 @@ class PushCellHandler(APIHandler):
         cell_id = str(data.get("cell_id"))
 
         # Push the cell content to the Redis list for the specified channel
+        
         await redis_client.add_cell(session_hash=session_hash, cell_id=cell_id, cell_data=cell_content, timestamp=cell_timestamp)
-
+        print("Cell push success:", cell_content, cell_timestamp, cell_id)
         self.finish({"status": "success", "message": "Cell content pushed to channel."})
     
 
@@ -49,6 +50,7 @@ class GetCellHandler(APIHandler):
             self.set_status(404)
             self.finish({"status": "error", "message": "Cell not found."})
             return
+        print("Cell get success:", cell_data)
         self.finish({"status": "success", "data": cell_data})
 
 class UpdateCellHandler(APIHandler):
@@ -71,7 +73,7 @@ class UpdateCellHandler(APIHandler):
             self.set_status(404)
             self.finish({"status": "error", "message": "Cell not found for update."})
             return
-
+        print("Cell update success:", cell_content, cell_timestamp, cell_id)
         self.finish({"status": "success", "message": "Cell content updated in channel."})
 
 
@@ -94,5 +96,5 @@ class DeleteCellHandler(APIHandler):
             self.set_status(404)
             self.finish({"status": "error", "message": "Cell not found for deletion."})
             return
-
+        print("Cell delete success:", cell_timestamp, cell_id)
         self.finish({"status": "success", "message": "Cell content deleted from channel."})

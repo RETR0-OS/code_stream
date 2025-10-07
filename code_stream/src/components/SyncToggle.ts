@@ -50,17 +50,19 @@ export class SyncToggle extends ToolbarButton {
 
     const cellId = this._cellTracker.getCellId(this._cell);
 
+    if (!cellId) {
+      console.error('Code Stream: Cannot toggle sync - invalid cell ID');
+      this._syncEnabled = !this._syncEnabled; // Revert toggle
+      return;
+    }
+
+    console.log(`Code Stream: Toggling sync to ${this._syncEnabled} for cell ${cellId}`);
+
+    // Update cell metadata FIRST using CellTracker helper
+    this._cellTracker.setSyncEnabled(this._cell, this._syncEnabled);
+
     // Update session manager
     await this._sessionManager.toggleSync(cellId, this._syncEnabled);
-
-    // Update cell metadata
-    const metadata = this._cellTracker.getCellMetadata(this._cell);
-    if (metadata) {
-      this._cell.model.metadata['code_stream'] = {
-        ...metadata,
-        sync_enabled: this._syncEnabled
-      };
-    }
 
     if (this._syncEnabled) {
       // Push cell immediately when enabled

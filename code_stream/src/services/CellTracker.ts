@@ -3,8 +3,9 @@
  * Integrates with JupyterLab notebook cells and triggers sync based on role
  */
 
-import { INotebookModel } from '@jupyterlab/notebook';
-import { Cell } from '@jupyterlab/cells';
+import { INotebookModel, CellList } from '@jupyterlab/notebook';
+import { Cell, ICellModel } from '@jupyterlab/cells';
+import { IObservableList } from '@jupyterlab/observables';
 import { SessionManager } from './SessionManager';
 import { RoleManager } from './RoleManager';
 import { ICellData, ICellMetadata, DEFAULTS } from '../models/types';
@@ -50,6 +51,10 @@ export class CellTracker {
    * @returns Cell ID
    */
   public getCellId(cell: Cell): string {
+    if (!cell || !cell.model || !cell.model.metadata) {
+      console.warn('Code Stream: Invalid cell or cell model');
+      return '';
+    }
     const metadataValue = cell.model.metadata['code_stream'];
     const metadata = metadataValue as ICellMetadata['code_stream'] | undefined;
 
@@ -75,9 +80,39 @@ export class CellTracker {
    * @returns Cell metadata or null
    */
   public getCellMetadata(cell: Cell): ICellMetadata['code_stream'] | null {
-    const metadataValue = cell.model.metadata['code_stream'];
+    // Use sharedModel.getMetadata() for JupyterLab 4.x compatibility
+    const allMetadata = cell.model.sharedModel.getMetadata();
+    const metadataValue = allMetadata['code_stream'];
     const metadata = metadataValue as ICellMetadata['code_stream'] | undefined;
     return metadata || null;
+  }
+
+  /**
+   * Update sync enabled state for a cell
+   * @param cell - Cell instance
+   * @param enabled - Sync enabled state
+   */
+  public setSyncEnabled(cell: Cell, enabled: boolean): void {
+    const cellId = this.getCellId(cell);
+
+    if (!cellId) {
+      console.warn('Code Stream: Cannot update sync state - invalid cell ID');
+      return;
+    }
+
+    const metadata = this.getCellMetadata(cell);
+
+    if (!metadata) {
+      console.warn('Code Stream: Cannot update sync state - no metadata found');
+      return;
+    }
+
+    this._setCellMetadata(cell, {
+      ...metadata,
+      sync_enabled: enabled
+    });
+
+    console.log(`Code Stream: Updated sync_enabled to ${enabled} for cell ${cellId}`);
   }
 
   /**
@@ -107,10 +142,21 @@ export class CellTracker {
    * @param cell - Cell instance
    */
   public detachCellListener(cell: Cell): void {
+    // Check if cell is valid before attempting to get ID
+    if (!cell || !cell.model || !cell.model.metadata) {
+      // Cell is already disposed, just clear all handlers
+      return;
+    }
+
     const cellId = this.getCellId(cell);
+
+    if (!cellId) {
+      return;
+    }
+
     const handler = this._debouncedSyncHandlers.get(cellId);
 
-    if (handler) {
+    if (handler && cell?.model?.contentChanged) {
       cell.model.contentChanged.disconnect(handler, this);
       this._debouncedSyncHandlers.delete(cellId);
     }
@@ -133,11 +179,25 @@ export class CellTracker {
     }
 
     const cellId = this.getCellId(cell);
-    const metadata = this.getCellMetadata(cell);
 
-    if (!metadata || !metadata.sync_enabled) {
+    if (!cellId) {
+      console.warn('Code Stream: Cannot sync cell - invalid cell ID');
       return;
     }
+
+    const metadata = this.getCellMetadata(cell);
+
+    if (!metadata) {
+      console.warn('Code Stream: Cannot sync cell - no metadata found');
+      return;
+    }
+
+    if (!metadata.sync_enabled) {
+      console.log(`Code Stream: Skipping sync for cell ${cellId} - sync not enabled`);
+      return;
+    }
+
+    console.log(`Code Stream: Syncing cell ${cellId} to backend...`);
 
     const cellData: ICellData = {
       cell_id: cellId,
@@ -282,25 +342,113 @@ export class CellTracker {
    */
   private _initializeCellMetadata(): void {
     if (!this._notebookModel) {
+      console.warn('Code Stream: Cannot initialize metadata - no notebook model');
       return;
     }
 
+    console.log(`Code Stream: Initializing metadata for ${this._notebookModel.cells.length} existing cell(s)`);
+    let initialized = 0;
+    let skipped = 0;
+
     for (let i = 0; i < this._notebookModel.cells.length; i++) {
-      const cell = this._notebookModel.cells.get(i);
-      if (cell) {
-        // Ensure cell has metadata
-        this.getCellId({ model: cell } as Cell);
+      const cellModel = this._notebookModel.cells.get(i);
+      if (cellModel && cellModel.sharedModel) {
+        // Use sharedModel.getMetadata() for JupyterLab 4.x compatibility
+        const allMetadata = cellModel.sharedModel.getMetadata();
+        const metadataValue = allMetadata['code_stream'];
+        const metadata = metadataValue as ICellMetadata['code_stream'] | undefined;
+
+        if (!metadata || !metadata.cell_id) {
+          const cellId = generateCellId();
+          const newMetadata: ICellMetadata['code_stream'] = {
+            cell_id: cellId,
+            sync_enabled: false,
+            last_synced: null,
+            sync_hash: this._sessionManager.getSessionHash() || ''
+          };
+
+          // Use sharedModel.setMetadata() for JupyterLab 4.x compatibility
+          cellModel.sharedModel.setMetadata({
+            ...allMetadata,
+            code_stream: newMetadata
+          });
+
+          // Verify it was set
+          const verifyAllMetadata = cellModel.sharedModel.getMetadata();
+          const verify = verifyAllMetadata['code_stream'];
+          if (verify) {
+            console.log(`Code Stream: Initialized metadata for existing cell ${cellId} at index ${i}`);
+            initialized++;
+          } else {
+            console.warn(`Code Stream: Failed to initialize metadata for cell at index ${i}`);
+          }
+        } else {
+          console.log(`Code Stream: Cell ${metadata.cell_id} at index ${i} already has metadata`);
+          skipped++;
+        }
+      } else {
+        console.warn(`Code Stream: Cell at index ${i} has no sharedModel`);
       }
     }
+
+    console.log(`Code Stream: Metadata initialization complete - ${initialized} initialized, ${skipped} skipped`);
   }
 
   /**
    * Handle cells added/removed
    * @private
    */
-  private _onCellsChanged(): void {
-    // Initialize metadata for new cells
-    this._initializeCellMetadata();
+  private _onCellsChanged(
+    sender: CellList,
+    changed: IObservableList.IChangedArgs<ICellModel>
+  ): void {
+    console.log(`Code Stream: Cells changed - type: ${changed.type}`);
+
+    // Handle cell additions
+    if (changed.type === 'add') {
+      console.log(`Code Stream: ${changed.newValues.length} new cell(s) added`);
+
+      // Initialize metadata for only the newly added cells
+      changed.newValues.forEach((cellModel, index) => {
+        if (cellModel && cellModel.sharedModel) {
+          // Use sharedModel.getMetadata() for JupyterLab 4.x compatibility
+          const allMetadata = cellModel.sharedModel.getMetadata();
+          const metadataValue = allMetadata['code_stream'];
+          const metadata = metadataValue as ICellMetadata['code_stream'] | undefined;
+
+          if (!metadata || !metadata.cell_id) {
+            const cellId = generateCellId();
+            const newMetadata: ICellMetadata['code_stream'] = {
+              cell_id: cellId,
+              sync_enabled: false,
+              last_synced: null,
+              sync_hash: this._sessionManager.getSessionHash() || ''
+            };
+
+            // Use sharedModel.setMetadata() for JupyterLab 4.x compatibility
+            cellModel.sharedModel.setMetadata({
+              ...allMetadata,
+              code_stream: newMetadata
+            });
+
+            // Verify it was set
+            const verifyAllMetadata = cellModel.sharedModel.getMetadata();
+            const verify = verifyAllMetadata['code_stream'];
+            if (verify) {
+              console.log(`Code Stream: Initialized metadata for new cell ${cellId} at index ${changed.newIndex + index}`);
+            } else {
+              console.warn(`Code Stream: Failed to initialize metadata for new cell at index ${changed.newIndex + index}`);
+            }
+          } else {
+            console.log(`Code Stream: Cell ${metadata.cell_id} already has metadata`);
+          }
+        } else {
+          console.warn('Code Stream: New cell has no sharedModel');
+        }
+      });
+    } else if (changed.type === 'remove') {
+      console.log(`Code Stream: ${changed.oldValues.length} cell(s) removed`);
+    }
   }
 
   /**
@@ -326,7 +474,21 @@ export class CellTracker {
     cell: Cell,
     metadata: ICellMetadata['code_stream']
   ): void {
-    cell.model.metadata['code_stream'] = metadata;
+    // Use sharedModel.setMetadata() for JupyterLab 4.x compatibility
+    const currentMetadata = cell.model.sharedModel.getMetadata();
+    cell.model.sharedModel.setMetadata({
+      ...currentMetadata,
+      code_stream: metadata
+    });
+
+    // Verify the metadata was set
+    const verifyAllMetadata = cell.model.sharedModel.getMetadata();
+    const verifyMetadata = verifyAllMetadata['code_stream'];
+    if (verifyMetadata) {
+      console.log(`Code Stream: Successfully set metadata for cell with ID ${metadata?.cell_id}`);
+    } else {
+      console.warn(`Code Stream: Failed to set metadata for cell with ID ${metadata?.cell_id}`);
+    }
   }
 
   /**

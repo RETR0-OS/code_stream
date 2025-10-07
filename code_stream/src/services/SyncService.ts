@@ -28,6 +28,13 @@ export class SyncService {
   ): Promise<IPushCellResponse> {
     try {
       const endpoint = `${hash}/push-cell/`;
+      console.log(`Code Stream: Calling push-cell API - endpoint: ${endpoint}`);
+      console.log(`Code Stream: Cell data:`, {
+        cell_id: cellData.cell_id,
+        cell_timestamp: cellData.cell_timestamp,
+        content_length: cellData.cell_content.length
+      });
+
       const response = await requestAPI<IPushCellResponse>(endpoint, {
         method: 'POST',
         body: JSON.stringify({
@@ -37,7 +44,7 @@ export class SyncService {
         })
       });
 
-      console.log(`Code Stream: Pushed cell ${cellData.cell_id} to session ${hash}`);
+      console.log(`Code Stream: Successfully pushed cell ${cellData.cell_id} to session ${hash}`, response);
       return response;
     } catch (error) {
       console.error('Code Stream: Error pushing cell:', error);
