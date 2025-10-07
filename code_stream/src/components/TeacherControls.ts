@@ -4,36 +4,45 @@
  */
 
 import { IDisposable } from '@lumino/disposable';
-import { NotebookPanel } from '@jupyterlab/notebook';
-import { ToolbarButton } from '@jupyterlab/apputils';
-import { SessionManager } from '../services/SessionManager';
-import { CellTracker } from '../services/CellTracker';
+// import { NotebookPanel } from '@jupyterlab/notebook'; // Removed: No longer using notebook panel
+// import { ToolbarButton } from '@jupyterlab/apputils'; // Removed: No longer using toolbar button
+// import { SessionManager } from '../services/SessionManager'; // Removed: No longer needed here
+// import { CellTracker } from '../services/CellTracker'; // Removed: No longer needed here
 
 /**
  * Teacher controls for notebook
+ *
+ * NOTE: This class is currently minimal as the main toolbar button has been moved
+ * to per-cell toolbar buttons (SyncToggle). It's kept for potential future
+ * session-level features or notebook-wide controls.
  */
 export class TeacherControls implements IDisposable {
-  private _notebookPanel: NotebookPanel;
-  private _sessionManager: SessionManager;
-  private _cellTracker: CellTracker;
-  private _toggleButton: ToolbarButton;
+  // All properties removed - now using per-cell SyncToggle buttons
+  // private _notebookPanel: NotebookPanel;
+  // private _sessionManager: SessionManager;
+  // private _cellTracker: CellTracker;
+  // private _toggleButton: ToolbarButton;
   private _isDisposed: boolean = false;
 
   /**
    * Constructor
-   * @param notebookPanel - Notebook panel instance
-   * @param sessionManager - Session manager instance
-   * @param cellTracker - Cell tracker instance
+   * @param notebookPanel - Notebook panel instance (kept for compatibility)
+   * @param sessionManager - Session manager instance (kept for compatibility)
+   * @param cellTracker - Cell tracker instance (kept for compatibility)
    */
   constructor(
-    notebookPanel: NotebookPanel,
-    sessionManager: SessionManager,
-    cellTracker: CellTracker
+    notebookPanel: any,
+    sessionManager: any,
+    cellTracker: any
   ) {
-    this._notebookPanel = notebookPanel;
-    this._sessionManager = sessionManager;
-    this._cellTracker = cellTracker;
+    // Parameters kept for backward compatibility but not used
+    // All functionality moved to per-cell SyncToggle buttons
 
+    // NOTE: Main toolbar button removed - now using per-cell toolbar buttons (SyncToggle)
+    // Each cell has its own sync toggle button in its toolbar, allowing teachers to
+    // enable/disable sync for individual cells independently
+
+    /* REMOVED: Main toolbar button (lines 37-60)
     // Create toggle button
     this._toggleButton = new ToolbarButton({
       icon: 'ui-components:link',
@@ -58,12 +67,15 @@ export class TeacherControls implements IDisposable {
 
     // Initial state update
     this._updateButtonState();
+    */
   }
 
+  /* REMOVED: Main toolbar button methods (now handled by per-cell SyncToggle buttons)
   /**
    * Handle toggle button click
    * @private
    */
+  /*
   private async _onToggleClick(): Promise<void> {
     const activeCell = this._notebookPanel.content.activeCell;
     if (!activeCell) {
@@ -83,10 +95,10 @@ export class TeacherControls implements IDisposable {
     await this._sessionManager.toggleSync(cellId, newSyncState);
 
     // Update cell metadata
-    (activeCell.model.metadata.set as any)('code_stream', {
+    activeCell.model.metadata['code_stream'] = {
       ...metadata,
       sync_enabled: newSyncState
-    });
+    };
 
     if (newSyncState) {
       // Push cell immediately when enabled
@@ -116,6 +128,7 @@ export class TeacherControls implements IDisposable {
    * Update button state based on active cell
    * @private
    */
+  /*
   private _updateButtonState(): void {
     const activeCell = this._notebookPanel.content.activeCell;
 
@@ -138,6 +151,7 @@ export class TeacherControls implements IDisposable {
       this._toggleButton.node.title = 'Sync disabled - Click to enable';
     }
   }
+  */
 
   /**
    * Check if disposed
@@ -154,6 +168,7 @@ export class TeacherControls implements IDisposable {
       return;
     }
 
+    /* REMOVED: Main toolbar button cleanup
     // Disconnect signals
     this._notebookPanel.content.activeCellChanged.disconnect(
       this._updateButtonState,
@@ -162,6 +177,7 @@ export class TeacherControls implements IDisposable {
 
     // Dispose button
     this._toggleButton.dispose();
+    */
 
     this._isDisposed = true;
   }

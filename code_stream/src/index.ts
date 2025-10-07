@@ -23,6 +23,7 @@ import { TeacherControls } from './components/TeacherControls';
 import { StudentControls } from './components/StudentControls';
 import { SessionPanel } from './components/SessionPanel';
 import { UpdateIcon } from './components/UpdateIcon';
+import { SyncToggle } from './components/SyncToggle';
 
 /**
  * Tracker for active notebook controls
@@ -56,19 +57,24 @@ const plugin: JupyterFrontEndPlugin<void> = {
     const sessionManager = new SessionManager(roleManager, syncService);
     const cellTracker = new CellTracker(sessionManager, roleManager);
 
-    // Register cell toolbar button for Student mode
+    // Register cell toolbar buttons for both Teacher and Student modes
     if (toolbarRegistry) {
       toolbarRegistry.addFactory(
         'Cell',
         'codeStreamSync',
         (cell: any) => {
-          // Only add sync button for students
           if (roleManager.isStudent()) {
+            // Students get sync/update button
             return new UpdateIcon(cell, cellTracker);
+          } else if (roleManager.isTeacher()) {
+            // Teachers get sync toggle button (enable/disable per cell)
+            return new SyncToggle(cell, sessionManager, cellTracker);
           }
-          // Return an empty Widget if not student
+          // Return empty hidden widget for other roles (required by TypeScript)
           const { Widget } = require('@lumino/widgets');
-          return new Widget();
+          const hiddenWidget = new Widget();
+          hiddenWidget.node.style.display = 'none';
+          return hiddenWidget;
         }
       );
       console.log('Code Stream: Cell toolbar factory registered');
@@ -156,6 +162,15 @@ const plugin: JupyterFrontEndPlugin<void> = {
     roleManager.roleChanged.connect(() => {
       console.log('Code Stream: Role changed, recreating controls');
       recreateAllControls();
+
+      // Force cell toolbar refresh by triggering widget updates
+      notebookTracker.forEach(panel => {
+        // Trigger re-render of cell toolbars
+        panel.content.widgets.forEach(cell => {
+          // Force widget update (this triggers toolbar rebuild)
+          cell.update();
+        });
+      });
     });
 
     // Add commands to command palette

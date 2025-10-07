@@ -56,10 +56,10 @@ export class SyncToggle extends ToolbarButton {
     // Update cell metadata
     const metadata = this._cellTracker.getCellMetadata(this._cell);
     if (metadata) {
-      (this._cell.model.metadata.set as any)('code_stream', {
+      this._cell.model.metadata['code_stream'] = {
         ...metadata,
         sync_enabled: this._syncEnabled
-      });
+      };
     }
 
     if (this._syncEnabled) {

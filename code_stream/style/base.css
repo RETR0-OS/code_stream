@@ -89,6 +89,45 @@
 }
 
 /* ==========================================================================
+   Teacher Sync Toggle (Cell Toolbar - Individual Cells)
+   ========================================================================== */
+
+.cs-sync-toggle {
+  padding: 2px 6px;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  min-width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Sync DISABLED = GREEN (safe state, not broadcasting) */
+.cs-sync-toggle-inactive {
+  background-color: var(--jp-success-color1);
+  color: var(--jp-ui-inverse-font-color1);
+  opacity: 0.7;
+}
+
+.cs-sync-toggle-inactive:hover {
+  opacity: 1;
+  background-color: var(--jp-success-color0);
+}
+
+/* Sync ENABLED = RED (active/danger state, broadcasting to students) */
+.cs-sync-toggle-active {
+  background-color: var(--jp-error-color1);
+  color: var(--jp-ui-inverse-font-color1);
+  opacity: 1;
+}
+
+.cs-sync-toggle-active:hover {
+  background-color: var(--jp-error-color0);
+}
+
+/* ==========================================================================
    Update Icon Button (Cell Toolbar - Individual Cells)
    ========================================================================== */
 
