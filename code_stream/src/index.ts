@@ -10,7 +10,7 @@ import {
 
 import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
-import { ICommandPalette } from '@jupyterlab/apputils';
+import { ICommandPalette, IToolbarWidgetRegistry } from '@jupyterlab/apputils';
 
 // Services
 import { RoleManager } from './services/RoleManager';
@@ -22,6 +22,7 @@ import { CellTracker } from './services/CellTracker';
 import { TeacherControls } from './components/TeacherControls';
 import { StudentControls } from './components/StudentControls';
 import { SessionPanel } from './components/SessionPanel';
+import { UpdateIcon } from './components/UpdateIcon';
 
 /**
  * Tracker for active notebook controls
@@ -39,12 +40,13 @@ const plugin: JupyterFrontEndPlugin<void> = {
   description: 'A jupyter extension to sync notebooks.',
   autoStart: true,
   requires: [INotebookTracker],
-  optional: [ISettingRegistry, ICommandPalette],
+  optional: [ISettingRegistry, ICommandPalette, IToolbarWidgetRegistry],
   activate: async (
     app: JupyterFrontEnd,
     notebookTracker: INotebookTracker,
     settingRegistry: ISettingRegistry | null,
-    palette: ICommandPalette | null
+    palette: ICommandPalette | null,
+    toolbarRegistry: IToolbarWidgetRegistry | null
   ) => {
     console.log('Code Stream: Extension activated');
 
@@ -53,6 +55,24 @@ const plugin: JupyterFrontEndPlugin<void> = {
     const syncService = new SyncService();
     const sessionManager = new SessionManager(roleManager, syncService);
     const cellTracker = new CellTracker(sessionManager, roleManager);
+
+    // Register cell toolbar button for Student mode
+    if (toolbarRegistry) {
+      toolbarRegistry.addFactory(
+        'Cell',
+        'codeStreamSync',
+        (cell: any) => {
+          // Only add sync button for students
+          if (roleManager.isStudent()) {
+            return new UpdateIcon(cell, cellTracker);
+          }
+          // Return an empty Widget if not student
+          const { Widget } = require('@lumino/widgets');
+          return new Widget();
+        }
+      );
+      console.log('Code Stream: Cell toolbar factory registered');
+    }
 
     // Track active notebook controls
     const notebookControls = new Map<string, INotebookControls>();

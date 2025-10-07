@@ -1,5 +1,13 @@
 {
   "jupyter.lab.shortcuts": [],
+  "jupyter.lab.toolbars": {
+    "Cell": [
+      {
+        "name": "codeStreamSync",
+        "rank": 45
+      }
+    ]
+  },
   "title": "code_stream",
   "description": "code_stream settings.",
   "type": "object",

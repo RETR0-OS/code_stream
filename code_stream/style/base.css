@@ -89,6 +89,51 @@
 }
 
 /* ==========================================================================
+   Update Icon Button (Cell Toolbar - Individual Cells)
+   ========================================================================== */
+
+.cs-update-icon {
+  padding: 2px 6px;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  min-width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cs-update-icon-default {
+  background-color: transparent;
+  opacity: 0.6;
+}
+
+.cs-update-icon-default:hover {
+  opacity: 1;
+  background-color: var(--jp-layout-color2);
+}
+
+.cs-update-icon-syncing {
+  background-color: var(--jp-info-color1);
+  color: var(--jp-ui-inverse-font-color1);
+  opacity: 1;
+  animation: cs-spin 1s linear infinite;
+}
+
+.cs-update-icon-success {
+  background-color: var(--jp-success-color1);
+  color: var(--jp-ui-inverse-font-color1);
+  opacity: 1;
+}
+
+.cs-update-icon-error {
+  background-color: var(--jp-error-color1);
+  color: var(--jp-ui-inverse-font-color1);
+  opacity: 1;
+}
+
+/* ==========================================================================
    Session Panel
    ========================================================================== */
 
