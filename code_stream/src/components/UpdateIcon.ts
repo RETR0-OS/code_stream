@@ -5,119 +5,98 @@
 import { ToolbarButton } from '@jupyterlab/apputils';
 import { Cell } from '@jupyterlab/cells';
 import { CellTracker } from '../services/CellTracker';
-import { SyncButtonState, DEFAULTS } from '../models/types';
-import { throttle } from '../utils/debounce';
+import { SessionManager } from '../services/SessionManager';
+import { CellSyncDropdown } from './CellSyncDropdown';
 
 /**
  * Update icon button for student cells
  */
 export class UpdateIcon extends ToolbarButton {
-  private _cell: Cell;
-  private _cellTracker: CellTracker;
-  private _state: SyncButtonState = SyncButtonState.Default;
-  private _throttledClick: (...args: any[]) => void;
+  private _dropdown: CellSyncDropdown;
+  private _hoverTimeout: number | null = null;
 
   /**
    * Constructor
    * @param cell - Cell instance
-   * @param cellTracker - Cell tracker instance
+   * @param cellTracker - Cell tracker instance (unused but kept for API compatibility)
+   * @param sessionManager - Session manager instance
    */
-  constructor(cell: Cell, cellTracker: CellTracker) {
+  constructor(cell: Cell, cellTracker: CellTracker, sessionManager: SessionManager) {
     super({
       icon: 'ui-components:refresh',
-      tooltip: 'Sync cell from teacher',
-      onClick: () => this._throttledClick()
+      tooltip: 'Hover to see available cells to sync',
+      onClick: () => {} // Disabled click - now using hover
     });
 
-    this._cell = cell;
-    this._cellTracker = cellTracker;
-
-    // Throttle clicks to prevent spam
-    this._throttledClick = throttle(
-      () => this._onUpdateClick(),
-      1000 // 1 second throttle
-    );
+    this._dropdown = new CellSyncDropdown(cell, sessionManager);
 
     this.addClass('cs-update-icon');
-    this._updateState(SyncButtonState.Default);
+    this.addClass('cs-update-icon-default');
+    this._setupDropdown();
   }
 
   /**
-   * Handle update click
+   * Setup dropdown event handlers
    * @private
    */
-  private async _onUpdateClick(): Promise<void> {
-    if (this._state === SyncButtonState.Syncing) {
-      // Already syncing, ignore
-      return;
-    }
+  private _setupDropdown(): void {
+    // Append dropdown to document body for proper positioning
+    document.body.appendChild(this._dropdown.element);
 
-    this._updateState(SyncButtonState.Syncing);
+    // Hover event - open dropdown with delay
+    this.node.addEventListener('mouseenter', () => {
+      this._hoverTimeout = window.setTimeout(() => {
+        this._dropdown.open(this.node);
+      }, 300); // 300ms delay before opening
+    });
 
-    try {
-      const success = await this._cellTracker.requestCellSync(this._cell);
-
-      if (success) {
-        this._updateState(SyncButtonState.Success);
-
-        // Return to default state after delay
-        setTimeout(() => {
-          this._updateState(SyncButtonState.Default);
-        }, DEFAULTS.SUCCESS_DISPLAY_DURATION);
-      } else {
-        this._updateState(SyncButtonState.Error);
-
-        // Return to default state after delay
-        setTimeout(() => {
-          this._updateState(SyncButtonState.Default);
-        }, DEFAULTS.SUCCESS_DISPLAY_DURATION);
+    // Leave event - close dropdown with delay
+    this.node.addEventListener('mouseleave', (e) => {
+      if (this._hoverTimeout) {
+        clearTimeout(this._hoverTimeout);
+        this._hoverTimeout = null;
       }
-    } catch (error) {
-      console.error('Code Stream: Error syncing cell:', error);
-      this._updateState(SyncButtonState.Error);
 
-      // Return to default state after delay
+      // Check if mouse is moving to dropdown
+      const relatedTarget = e.relatedTarget as HTMLElement;
+      if (relatedTarget && this._dropdown.element.contains(relatedTarget)) {
+        return; // Don't close if moving to dropdown
+      }
+
+      // Add delay before closing to allow user to move to dropdown
       setTimeout(() => {
-        this._updateState(SyncButtonState.Default);
-      }, DEFAULTS.SUCCESS_DISPLAY_DURATION);
-    }
+        // Only close if mouse is not over button or dropdown
+        if (!this.node.matches(':hover') && !this._dropdown.element.matches(':hover')) {
+          this._dropdown.close();
+        }
+      }, 200); // 200ms grace period
+    });
+
+    // Close dropdown when mouse leaves dropdown area with delay
+    this._dropdown.element.addEventListener('mouseleave', (e) => {
+      const relatedTarget = e.relatedTarget as HTMLElement;
+      if (relatedTarget && this.node.contains(relatedTarget)) {
+        return; // Don't close if moving back to button
+      }
+
+      // Add delay before closing to allow user to move back
+      setTimeout(() => {
+        // Only close if mouse is not over button or dropdown
+        if (!this.node.matches(':hover') && !this._dropdown.element.matches(':hover')) {
+          this._dropdown.close();
+        }
+      }, 200); // 200ms grace period
+    });
   }
 
   /**
-   * Update button state
-   * @private
-   * @param state - New state
+   * Dispose of resources
    */
-  private _updateState(state: SyncButtonState): void {
-    this._state = state;
-
-    // Remove all state classes
-    this.removeClass('cs-update-icon-default');
-    this.removeClass('cs-update-icon-syncing');
-    this.removeClass('cs-update-icon-success');
-    this.removeClass('cs-update-icon-error');
-
-    // Add new state class
-    switch (state) {
-      case SyncButtonState.Default:
-        this.addClass('cs-update-icon-default');
-        this.node.title = 'Sync cell from teacher';
-        break;
-
-      case SyncButtonState.Syncing:
-        this.addClass('cs-update-icon-syncing');
-        this.node.title = 'Syncing...';
-        break;
-
-      case SyncButtonState.Success:
-        this.addClass('cs-update-icon-success');
-        this.node.title = 'Synced successfully';
-        break;
-
-      case SyncButtonState.Error:
-        this.addClass('cs-update-icon-error');
-        this.node.title = 'Sync failed - Click to retry';
-        break;
+  public dispose(): void {
+    if (this._hoverTimeout) {
+      clearTimeout(this._hoverTimeout);
     }
+    this._dropdown.dispose();
+    super.dispose();
   }
 }

@@ -98,3 +98,10 @@ class DeleteCellHandler(APIHandler):
             return
         print("Cell delete success:", cell_timestamp, cell_id)
         self.finish({"status": "success", "message": "Cell content deleted from channel."})
+
+class GetAllCellIDsHandler(APIHandler):
+    # @tornado.web.authenticated
+    async def get(self):
+        cell_ids = await redis_client.get_all_cell_ids()
+        print("Get all cell IDs success:", cell_ids)
+        self.finish({"status": "success", "data": cell_ids})

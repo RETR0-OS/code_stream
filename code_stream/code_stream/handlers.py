@@ -4,7 +4,7 @@ from jupyter_server.base.handlers import APIHandler
 from jupyter_server.utils import url_path_join
 import tornado
 
-from .redis_views import PushCellHandler, GetCellHandler, UpdateCellHandler, DeleteCellHandler
+from .redis_views import PushCellHandler, GetCellHandler, UpdateCellHandler, DeleteCellHandler, GetAllCellIDsHandler
 
 
 class RouteHandler(APIHandler):
@@ -28,8 +28,9 @@ def setup_handlers(web_app):
     get_cell = url_path_join(base_url, r"/code_stream/([a-zA-Z0-9]{6})/get-cell/")
     update_cell = url_path_join(base_url, r"/code_stream/([a-zA-Z0-9]{6})/update/")
     delete_cell = url_path_join(base_url, r"/code_stream/([a-zA-Z0-9]{6})/delete/")
+    get_all_cell_ids = url_path_join(base_url, r"/code_stream/get-all-cell-ids/")
 
-    
+
     route_pattern = url_path_join(base_url, "code-stream", "get-example")
     handlers = [
         (route_pattern, RouteHandler),
@@ -37,5 +38,6 @@ def setup_handlers(web_app):
         (get_cell, GetCellHandler),
         (update_cell, UpdateCellHandler),
         (delete_cell, DeleteCellHandler),
+        (get_all_cell_ids, GetAllCellIDsHandler),
     ]
     web_app.add_handlers(host_pattern, handlers)

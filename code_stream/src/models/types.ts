@@ -82,6 +82,15 @@ export interface IDeleteCellResponse {
 }
 
 /**
+ * API response for get all cell IDs
+ */
+export interface IGetAllCellIDsResponse {
+  status: 'success' | 'error';
+  data?: string[];
+  message?: string;
+}
+
+/**
  * Sync button state
  */
 export enum SyncButtonState {

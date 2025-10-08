@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from hashlib import md5
-from typing import Optional, Any, Dict
+from typing import List, Optional, Any, Dict
 import redis.asyncio as async_redis
 
 
@@ -16,7 +16,6 @@ class RedisClient:
         # Include session_hash in key for session isolation
         combined = f"{session_hash}:{cell_id}"
         return md5(combined.encode()).hexdigest()
-
     
     async def add_cell(self, session_hash: str, cell_id: str, cell_data: str, timestamp: str) -> bool:
         try:
@@ -68,6 +67,21 @@ class RedisClient:
         except Exception as e:
             print(f"Error updating cell: {e}")
             return False
+    
+    async def get_all_cell_ids(self) -> List[str]:
+        try:
+            keys = await self.client.keys('*')
+            cell_ids = set()
+            for key in keys:
+                data = await self.client.hgetall(key)
+                cell_id = data.get(b'cell_id', b'').decode('utf-8')
+                if cell_id:
+                    cell_ids.add(cell_id)
+            return list(cell_ids)
+        except Exception as e:
+            print(f"Error retrieving all cell IDs: {e}")
+            return []
+
 
 redis_client = RedisClient()
         

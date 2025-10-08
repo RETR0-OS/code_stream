@@ -65,7 +65,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         (cell: any) => {
           if (roleManager.isStudent()) {
             // Students get sync/update button
-            return new UpdateIcon(cell, cellTracker);
+            return new UpdateIcon(cell, cellTracker, sessionManager);
           } else if (roleManager.isTeacher()) {
             // Teachers get sync toggle button (enable/disable per cell)
             return new SyncToggle(cell, sessionManager, cellTracker);

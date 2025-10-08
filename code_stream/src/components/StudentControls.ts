@@ -1,33 +1,46 @@
 /**
  * StudentControls - Manages student-specific UI controls
- * Adds update/sync button to notebook toolbar
+ *
+ * NOTE: This class is currently minimal as the main toolbar button has been moved
+ * to per-cell toolbar buttons (UpdateIcon). It's kept for potential future
+ * session-level features or notebook-wide controls.
  */
 
 import { IDisposable } from '@lumino/disposable';
-import { NotebookPanel } from '@jupyterlab/notebook';
-import { ToolbarButton } from '@jupyterlab/apputils';
-import { CellTracker } from '../services/CellTracker';
-import { SyncButtonState, DEFAULTS } from '../models/types';
+// import { NotebookPanel } from '@jupyterlab/notebook'; // Removed: No longer using notebook panel
+// import { ToolbarButton } from '@jupyterlab/apputils'; // Removed: No longer using toolbar button
+// import { CellTracker } from '../services/CellTracker'; // Removed: No longer needed here
+// import { SyncButtonState, DEFAULTS } from '../models/types'; // Removed: No longer needed here
 
 /**
  * Student controls for notebook
+ *
+ * NOTE: This class is currently minimal as the main toolbar button has been moved
+ * to per-cell toolbar buttons (UpdateIcon). It's kept for potential future
+ * session-level features or notebook-wide controls.
  */
 export class StudentControls implements IDisposable {
-  private _notebookPanel: NotebookPanel;
-  private _cellTracker: CellTracker;
-  private _updateButton: ToolbarButton;
-  private _state: SyncButtonState = SyncButtonState.Default;
+  // All properties removed - now using per-cell UpdateIcon buttons
+  // private _notebookPanel: NotebookPanel;
+  // private _cellTracker: CellTracker;
+  // private _updateButton: ToolbarButton;
+  // private _state: SyncButtonState = SyncButtonState.Default;
   private _isDisposed: boolean = false;
 
   /**
    * Constructor
-   * @param notebookPanel - Notebook panel instance
-   * @param cellTracker - Cell tracker instance
+   * @param notebookPanel - Notebook panel instance (kept for compatibility)
+   * @param cellTracker - Cell tracker instance (kept for compatibility)
    */
-  constructor(notebookPanel: NotebookPanel, cellTracker: CellTracker) {
-    this._notebookPanel = notebookPanel;
-    this._cellTracker = cellTracker;
+  constructor(notebookPanel: any, cellTracker: any) {
+    // Parameters kept for backward compatibility but not used
+    // All functionality moved to per-cell UpdateIcon buttons
 
+    // NOTE: Main toolbar button removed - now using per-cell toolbar buttons (UpdateIcon)
+    // Each cell has its own sync/update button in its toolbar, allowing students to
+    // sync individual cells from the teacher independently
+
+    /* REMOVED: Main toolbar button (lines 32-49)
     // Create update button
     this._updateButton = new ToolbarButton({
       icon: 'ui-components:refresh',
@@ -46,12 +59,15 @@ export class StudentControls implements IDisposable {
 
     // Initial state
     this._updateState(SyncButtonState.Default);
+    */
   }
 
+  /* REMOVED: Main toolbar button methods (now handled by per-cell UpdateIcon buttons)
   /**
    * Handle update button click
    * @private
    */
+  /*
   private async _onUpdateClick(): Promise<void> {
     if (this._state === SyncButtonState.Syncing) {
       // Already syncing, ignore
@@ -99,6 +115,7 @@ export class StudentControls implements IDisposable {
    * @private
    * @param state - New state
    */
+  /*
   private _updateState(state: SyncButtonState): void {
     this._state = state;
 
@@ -131,6 +148,7 @@ export class StudentControls implements IDisposable {
         break;
     }
   }
+  */
 
   /**
    * Check if disposed
@@ -147,8 +165,10 @@ export class StudentControls implements IDisposable {
       return;
     }
 
+    /* REMOVED: Main toolbar button cleanup
     // Dispose button
     this._updateButton.dispose();
+    */
 
     this._isDisposed = true;
   }

@@ -9,7 +9,8 @@ import {
   IPushCellResponse,
   IGetCellResponse,
   IUpdateCellResponse,
-  IDeleteCellResponse
+  IDeleteCellResponse,
+  IGetAllCellIDsResponse
 } from '../models/types';
 
 /**
@@ -133,6 +134,25 @@ export class SyncService {
       return response;
     } catch (error) {
       console.error('Code Stream: Error deleting cell:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all available cell IDs (Student)
+   * @returns Promise with list of cell IDs
+   */
+  public async getAllCellIds(): Promise<IGetAllCellIDsResponse> {
+    try {
+      const endpoint = `get-all-cell-ids/`;
+      const response = await requestAPI<IGetAllCellIDsResponse>(endpoint, {
+        method: 'GET'
+      });
+
+      console.log(`Code Stream: Retrieved all cell IDs`, response);
+      return response;
+    } catch (error) {
+      console.error('Code Stream: Error getting all cell IDs:', error);
       throw error;
     }
   }

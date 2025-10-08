@@ -173,6 +173,87 @@
 }
 
 /* ==========================================================================
+   Cell Sync Dropdown
+   ========================================================================== */
+
+.cs-sync-dropdown {
+  position: fixed;
+  background-color: var(--jp-layout-color1);
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 150px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 10000;
+  padding: 4px 0;
+}
+
+.cs-sync-dropdown-loading,
+.cs-sync-dropdown-error,
+.cs-sync-dropdown-empty {
+  padding: 12px 16px;
+  font-size: 12px;
+  color: var(--jp-ui-font-color2);
+  text-align: center;
+}
+
+.cs-sync-dropdown-error {
+  color: var(--jp-error-color1);
+}
+
+.cs-sync-dropdown-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cs-sync-dropdown-item {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--jp-ui-font-color1);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  user-select: none;
+}
+
+.cs-sync-dropdown-item:hover {
+  background-color: var(--jp-layout-color2);
+}
+
+.cs-sync-dropdown-item:active {
+  background-color: var(--jp-brand-color3);
+}
+
+/* ==========================================================================
+   Ghost Text Preview
+   ========================================================================== */
+
+.cs-ghost-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 8px 12px;
+  font-family: var(--jp-code-font-family);
+  font-size: var(--jp-code-font-size);
+  line-height: var(--jp-code-line-height);
+  color: var(--jp-ui-font-color2);
+  opacity: 0.6;
+  pointer-events: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background-color: var(--jp-layout-color2);
+  border-radius: 4px;
+  z-index: 100;
+  font-style: italic;
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
    Session Panel
    ========================================================================== */
 
