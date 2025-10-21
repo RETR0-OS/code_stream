@@ -99,14 +99,40 @@ export class SessionPanel extends Widget {
    * Render student view
    * @private
    */
-  private _renderStudentView(): void {
+  private async _renderStudentView(): Promise<void> {
     const sessionHash = this._sessionManager.getSessionHash();
+    const teacherBaseUrl = this._sessionManager.getTeacherBaseUrl();
 
     this.node.innerHTML = `
       <div class="cs-session-panel-content">
         <div class="cs-session-header">
           <h3>Student Session</h3>
         </div>
+
+        <!-- Teacher Server Configuration -->
+        <div class="cs-config-section">
+          <h4>Teacher Server Configuration</h4>
+          <label>Teacher Server URL</label>
+          <input
+            type="text"
+            class="cs-teacher-url-input"
+            placeholder="http://192.168.1.10:8888"
+            value="${teacherBaseUrl || ''}"
+          />
+          <label>Token (Optional)</label>
+          <input
+            type="password"
+            class="cs-teacher-token-input"
+            placeholder="Enter token if required"
+          />
+          <div class="cs-config-actions">
+            <button class="cs-save-config-button">Save</button>
+            <button class="cs-test-connection-button">Test Connection</button>
+          </div>
+          <div class="cs-config-status"></div>
+        </div>
+
+        <!-- Session Join Section -->
         ${
           sessionHash
             ? `
@@ -130,17 +156,38 @@ export class SessionPanel extends Widget {
             class="cs-join-input"
             placeholder="Enter 6-character code"
             maxlength="6"
+            ${!teacherBaseUrl ? 'disabled title="Configure teacher server first"' : ''}
           />
-          <button class="cs-join-button">Join</button>
+          <button class="cs-join-button" ${!teacherBaseUrl ? 'disabled' : ''}>Join</button>
+          ${!teacherBaseUrl ? '<p class="cs-warning">⚠️ Configure teacher server before joining</p>' : ''}
         </div>
         <div class="cs-session-status">
-          <span class="cs-status-indicator cs-status-inactive"></span>
-          <span>Not Connected</span>
+          <span class="cs-status-indicator ${teacherBaseUrl ? 'cs-status-ready' : 'cs-status-inactive'}"></span>
+          <span>${teacherBaseUrl ? 'Ready to join' : 'Not Configured'}</span>
         </div>
         `
         }
       </div>
     `;
+
+    // Setup config inputs and buttons
+    const teacherUrlInput = this.node.querySelector('.cs-teacher-url-input') as HTMLInputElement;
+    const teacherTokenInput = this.node.querySelector('.cs-teacher-token-input') as HTMLInputElement;
+    const saveConfigButton = this.node.querySelector('.cs-save-config-button') as HTMLButtonElement;
+    const testConnectionButton = this.node.querySelector('.cs-test-connection-button') as HTMLButtonElement;
+    const configStatus = this.node.querySelector('.cs-config-status') as HTMLElement;
+
+    if (saveConfigButton) {
+      saveConfigButton.addEventListener('click', () =>
+        this._saveConfig(teacherUrlInput, teacherTokenInput, configStatus)
+      );
+    }
+
+    if (testConnectionButton) {
+      testConnectionButton.addEventListener('click', () =>
+        this._testConnection(configStatus)
+      );
+    }
 
     // Setup join input and button
     this._joinInputElement = this.node.querySelector('.cs-join-input');
@@ -260,6 +307,73 @@ export class SessionPanel extends Widget {
    */
   private _onRoleChanged(): void {
     this._render();
+  }
+
+  /**
+   * Save teacher server configuration
+   * @private
+   */
+  private async _saveConfig(
+    urlInput: HTMLInputElement,
+    tokenInput: HTMLInputElement,
+    statusElement: HTMLElement
+  ): Promise<void> {
+    const url = urlInput.value.trim();
+    const token = tokenInput.value.trim();
+
+    if (!url) {
+      statusElement.innerHTML = '<span class="cs-error">❌ Please enter a teacher server URL</span>';
+      return;
+    }
+
+    statusElement.innerHTML = '<span class="cs-info">⏳ Saving configuration...</span>';
+
+    try {
+      const response = await this._sessionManager.syncService.setConfig({
+        teacher_base_url: url,
+        teacher_token: token || undefined
+      });
+
+      if (response.status === 'success') {
+        // Update SessionManager with the new URL
+        this._sessionManager.setTeacherBaseUrl(url);
+
+        // Clear token input for security
+        tokenInput.value = '';
+
+        statusElement.innerHTML = '<span class="cs-success">✓ Configuration saved successfully</span>';
+
+        // Re-render to update UI state
+        setTimeout(() => this._render(), 1500);
+      } else {
+        statusElement.innerHTML = `<span class="cs-error">❌ ${response.message || 'Failed to save configuration'}</span>`;
+      }
+    } catch (error) {
+      console.error('Code Stream: Error saving config:', error);
+      statusElement.innerHTML = '<span class="cs-error">❌ Failed to save configuration</span>';
+    }
+  }
+
+  /**
+   * Test connection to teacher server
+   * @private
+   */
+  private async _testConnection(statusElement: HTMLElement): Promise<void> {
+    statusElement.innerHTML = '<span class="cs-info">⏳ Testing connection...</span>';
+
+    try {
+      const response = await this._sessionManager.syncService.testConnection();
+
+      if (response.status === 'success') {
+        statusElement.innerHTML = '<span class="cs-success">✓ Connection successful!</span>';
+      } else {
+        statusElement.innerHTML = `<span class="cs-error">❌ ${response.message}</span>`;
+      }
+    } catch (error: any) {
+      console.error('Code Stream: Error testing connection:', error);
+      const message = error?.message || 'Failed to test connection';
+      statusElement.innerHTML = `<span class="cs-error">❌ ${message}</span>`;
+    }
   }
 
   /**

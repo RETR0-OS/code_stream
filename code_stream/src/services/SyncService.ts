@@ -10,7 +10,10 @@ import {
   IGetCellResponse,
   IUpdateCellResponse,
   IDeleteCellResponse,
-  IGetAllCellIDsResponse
+  IGetAllCellIDsResponse,
+  ITeacherServerConfig,
+  IConfigResponse,
+  ITestConnectionResponse
 } from '../models/types';
 
 /**
@@ -140,6 +143,7 @@ export class SyncService {
 
   /**
    * Get all available cell IDs (Student)
+   * Note: Now proxied through local server to teacher server
    * @returns Promise with list of cell IDs
    */
   public async getAllCellIds(): Promise<IGetAllCellIDsResponse> {
@@ -153,6 +157,65 @@ export class SyncService {
       return response;
     } catch (error) {
       console.error('Code Stream: Error getting all cell IDs:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get teacher server configuration (Student)
+   * @returns Promise with config response
+   */
+  public async getConfig(): Promise<IConfigResponse> {
+    try {
+      const endpoint = `config`;
+      const response = await requestAPI<IConfigResponse>(endpoint, {
+        method: 'GET'
+      });
+
+      console.log(`Code Stream: Retrieved config`, response);
+      return response;
+    } catch (error) {
+      console.error('Code Stream: Error getting config:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Set teacher server configuration (Student)
+   * @param config - Teacher server configuration
+   * @returns Promise with config response
+   */
+  public async setConfig(config: ITeacherServerConfig): Promise<IConfigResponse> {
+    try {
+      const endpoint = `config`;
+      const response = await requestAPI<IConfigResponse>(endpoint, {
+        method: 'POST',
+        body: JSON.stringify(config)
+      });
+
+      console.log(`Code Stream: Set config successfully`);
+      return response;
+    } catch (error) {
+      console.error('Code Stream: Error setting config:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Test connection to teacher server (Student)
+   * @returns Promise with test response
+   */
+  public async testConnection(): Promise<ITestConnectionResponse> {
+    try {
+      const endpoint = `test`;
+      const response = await requestAPI<ITestConnectionResponse>(endpoint, {
+        method: 'POST'
+      });
+
+      console.log(`Code Stream: Test connection result:`, response);
+      return response;
+    } catch (error) {
+      console.error('Code Stream: Error testing connection:', error);
       throw error;
     }
   }

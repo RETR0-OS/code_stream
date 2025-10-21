@@ -22,10 +22,12 @@ export class SessionManager {
   private _roleManager: RoleManager;
   private _syncService: SyncService;
   private _sessionHash: string | null = null;
+  private _teacherBaseUrl: string | null = null;
   private _cellStates: Map<string, ICellSyncState> = new Map();
   private _notebookModel: INotebookModel | null = null;
   private _sessionChanged = new Signal<this, string | null>(this);
   private _cellStateChanged = new Signal<this, ICellSyncState>(this);
+  private _teacherBaseUrlChanged = new Signal<this, string | null>(this);
 
   /**
    * Constructor
@@ -38,6 +40,9 @@ export class SessionManager {
 
     // Load session hash from localStorage
     this._loadSessionHash();
+
+    // Load teacher base URL from localStorage (for students)
+    this._loadTeacherBaseUrl();
   }
 
   /**
@@ -215,6 +220,55 @@ export class SessionManager {
   }
 
   /**
+   * Get teacher base URL (Student)
+   * @returns Teacher base URL or null
+   */
+  public getTeacherBaseUrl(): string | null {
+    return this._teacherBaseUrl;
+  }
+
+  /**
+   * Set teacher base URL (Student only)
+   * @param url - Teacher server base URL
+   */
+  public setTeacherBaseUrl(url: string): void {
+    if (!this._roleManager.isStudent()) {
+      console.warn('Code Stream: Only students can set teacher base URL');
+      return;
+    }
+
+    this._teacherBaseUrl = url;
+
+    // Persist to localStorage (for display/reuse)
+    localStorage.setItem(STORAGE_KEYS.TEACHER_BASE_URL, url);
+
+    // Optionally persist to notebook metadata (for display only)
+    this._saveNotebookMetadata();
+
+    this._teacherBaseUrlChanged.emit(url);
+
+    console.log(`Code Stream: Set teacher base URL: ${url}`);
+  }
+
+  /**
+   * Clear teacher base URL (Student)
+   */
+  public clearTeacherBaseUrl(): void {
+    this._teacherBaseUrl = null;
+    localStorage.removeItem(STORAGE_KEYS.TEACHER_BASE_URL);
+    this._teacherBaseUrlChanged.emit(null);
+
+    console.log('Code Stream: Cleared teacher base URL');
+  }
+
+  /**
+   * Signal emitted when teacher base URL changes
+   */
+  public get teacherBaseUrlChanged(): ISignal<this, string | null> {
+    return this._teacherBaseUrlChanged;
+  }
+
+  /**
    * Load session hash from localStorage
    * @private
    */
@@ -223,6 +277,18 @@ export class SessionManager {
     if (hash && validateHash(hash)) {
       this._sessionHash = hash;
       console.log(`Code Stream: Loaded session hash from localStorage: ${hash}`);
+    }
+  }
+
+  /**
+   * Load teacher base URL from localStorage
+   * @private
+   */
+  private _loadTeacherBaseUrl(): void {
+    const url = localStorage.getItem(STORAGE_KEYS.TEACHER_BASE_URL);
+    if (url) {
+      this._teacherBaseUrl = url;
+      console.log(`Code Stream: Loaded teacher base URL from localStorage: ${url}`);
     }
   }
 
@@ -249,6 +315,12 @@ export class SessionManager {
       this._sessionHash = metadata.session_hash;
       console.log(`Code Stream: Loaded session from notebook metadata: ${metadata.session_hash}`);
     }
+
+    // Load teacher base URL from notebook metadata (students only, for display)
+    if (metadata && metadata.teacher_base_url && this._roleManager.isStudent()) {
+      this._teacherBaseUrl = metadata.teacher_base_url;
+      console.log(`Code Stream: Loaded teacher base URL from notebook metadata: ${metadata.teacher_base_url}`);
+    }
   }
 
   /**
@@ -264,6 +336,11 @@ export class SessionManager {
       session_hash: this._sessionHash,
       created_at: Date.now()
     };
+
+    // Include teacher_base_url if student and URL is set (for display only, never token)
+    if (this._roleManager.isStudent() && this._teacherBaseUrl) {
+      metadata.teacher_base_url = this._teacherBaseUrl;
+    }
 
     this._notebookModel.setMetadata('code_stream', metadata);
     console.log('Code Stream: Saved session to notebook metadata');
