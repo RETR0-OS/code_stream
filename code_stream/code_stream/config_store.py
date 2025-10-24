@@ -6,7 +6,7 @@ Stores per-user teacher server configuration securely.
 import json
 import os
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 from jupyter_core.paths import jupyter_data_dir
 
 
@@ -27,26 +27,29 @@ class ConfigStore:
         except Exception as e:
             print(f"Warning: Could not set directory permissions: {e}")
 
-    def _get_config_path(self, user_id: str) -> Path:
+    def _get_config_path(self, user_id: Union[str, Any]) -> Path:
         """
         Get the config file path for a specific user.
 
         Args:
-            user_id: User identifier
+            user_id: User identifier (string or User object)
 
         Returns:
             Path to user's config file
         """
+        # Convert user_id to string (handles both str and User objects)
+        user_id_str = str(user_id)
+
         # Sanitize user_id to prevent directory traversal
-        safe_user_id = "".join(c for c in user_id if c.isalnum() or c in ('_', '-'))
+        safe_user_id = "".join(c for c in user_id_str if c.isalnum() or c in ('_', '-'))
         return self.config_dir / f"config_{safe_user_id}.json"
 
-    def get_config(self, user_id: str) -> Optional[Dict[str, Any]]:
+    def get_config(self, user_id: Union[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Retrieve configuration for a user.
 
         Args:
-            user_id: User identifier
+            user_id: User identifier (string or User object)
 
         Returns:
             Configuration dictionary or None if not found
@@ -64,12 +67,12 @@ class ConfigStore:
             print(f"Error reading config for user {user_id}: {e}")
             return None
 
-    def set_config(self, user_id: str, config: Dict[str, Any]) -> bool:
+    def set_config(self, user_id: Union[str, Any], config: Dict[str, Any]) -> bool:
         """
         Store configuration for a user.
 
         Args:
-            user_id: User identifier
+            user_id: User identifier (string or User object)
             config: Configuration dictionary containing:
                 - teacher_base_url: str (required)
                 - teacher_token: str | None (optional)
@@ -94,12 +97,12 @@ class ConfigStore:
             print(f"Error saving config for user {user_id}: {e}")
             return False
 
-    def delete_config(self, user_id: str) -> bool:
+    def delete_config(self, user_id: Union[str, Any]) -> bool:
         """
         Delete configuration for a user.
 
         Args:
-            user_id: User identifier
+            user_id: User identifier (string or User object)
 
         Returns:
             True if successful, False otherwise
@@ -117,12 +120,12 @@ class ConfigStore:
             print(f"Error deleting config for user {user_id}: {e}")
             return False
 
-    def get_teacher_url(self, user_id: str) -> Optional[str]:
+    def get_teacher_url(self, user_id: Union[str, Any]) -> Optional[str]:
         """
         Get just the teacher base URL for a user.
 
         Args:
-            user_id: User identifier
+            user_id: User identifier (string or User object)
 
         Returns:
             Teacher base URL or None
@@ -130,12 +133,12 @@ class ConfigStore:
         config = self.get_config(user_id)
         return config.get('teacher_base_url') if config else None
 
-    def get_teacher_token(self, user_id: str) -> Optional[str]:
+    def get_teacher_token(self, user_id: Union[str, Any]) -> Optional[str]:
         """
         Get the teacher token for a user.
 
         Args:
-            user_id: User identifier
+            user_id: User identifier (string or User object)
 
         Returns:
             Teacher token or None
@@ -143,12 +146,12 @@ class ConfigStore:
         config = self.get_config(user_id)
         return config.get('teacher_token') if config else None
 
-    def has_config(self, user_id: str) -> bool:
+    def has_config(self, user_id: Union[str, Any]) -> bool:
         """
         Check if user has a configuration stored.
 
         Args:
-            user_id: User identifier
+            user_id: User identifier (string or User object)
 
         Returns:
             True if config exists, False otherwise
