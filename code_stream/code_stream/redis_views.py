@@ -95,8 +95,15 @@ class DeleteCellHandler(APIHandler):
         self.finish({"status": "success", "message": "Cell content deleted from channel."})
 
 class GetAllCellIDsHandler(APIHandler):
+    """
+    Legacy handler for getting all cell IDs.
+    NOTE: This is no longer used - UnifiedGetAllCellIDsHandler is used instead.
+    Kept for backward compatibility if directly imported.
+    """
     @tornado.web.authenticated
-    async def get(self):
-        cell_ids = await redis_client.get_all_cell_ids()
-        print("Get all cell IDs success:", cell_ids)
+    async def get(self, session_hash: str = ""):
+        # Support optional session hash
+        session_hash_param = session_hash if session_hash else None
+        cell_ids = await redis_client.get_all_cell_ids(session_hash_param)
+        print(f"Get all cell IDs success (session={session_hash_param}):", cell_ids)
         self.finish({"status": "success", "data": cell_ids})

@@ -35,8 +35,12 @@ def setup_handlers(web_app):
     config_endpoint = url_path_join(base_url, r"/code_stream/config")
     test_endpoint = url_path_join(base_url, r"/code_stream/test")
 
-    # Proxy endpoints (student reads proxied to teacher server)
-    proxy_get_all_cell_ids = url_path_join(base_url, r"/code_stream/get-all-cell-ids/")
+    # Unified endpoints (auto-detect teacher/student mode for read operations)
+    # Session-scoped get-all-cell-ids (primary)
+    session_get_all_cell_ids = url_path_join(base_url, r"/code_stream/([a-zA-Z0-9]{6})/get-all-cell-ids/")
+    # Global get-all-cell-ids (backward compatibility)
+    global_get_all_cell_ids = url_path_join(base_url, r"/code_stream/get-all-cell-ids/")
+    # Get cell (session-scoped)
     proxy_get_cell = url_path_join(base_url, r"/code_stream/([a-zA-Z0-9]{6})/get-cell/")
 
     # Example endpoint
@@ -52,7 +56,8 @@ def setup_handlers(web_app):
         (config_endpoint, ConfigHandler),
         (test_endpoint, TestConnectionHandler),
         # Unified endpoints (auto-detect teacher/student mode for read operations)
-        (proxy_get_all_cell_ids, UnifiedGetAllCellIDsHandler),
+        (session_get_all_cell_ids, UnifiedGetAllCellIDsHandler),
+        (global_get_all_cell_ids, UnifiedGetAllCellIDsHandler),
         (proxy_get_cell, UnifiedGetCellHandler),
     ]
     web_app.add_handlers(host_pattern, handlers)

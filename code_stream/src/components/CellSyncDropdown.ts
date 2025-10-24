@@ -57,9 +57,15 @@ export class CellSyncDropdown {
     // Position dropdown relative to anchor
     this._positionDropdown(anchorElement);
 
-    // Fetch available cell IDs
+    // Fetch available cell IDs for current session
     try {
-      const response = await this._sessionManager.syncService.getAllCellIds();
+      const sessionHash = this._sessionManager.getSessionHash();
+      if (!sessionHash) {
+        this._dropdownElement.innerHTML = '<div class="cs-sync-dropdown-error">No active session</div>';
+        return;
+      }
+
+      const response = await this._sessionManager.syncService.getAllCellIds(sessionHash);
 
       if (response.status === 'success' && response.data) {
         this._populateDropdown(response.data);

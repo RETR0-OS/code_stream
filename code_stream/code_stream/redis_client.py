@@ -13,7 +13,13 @@ class RedisClient:
 
     
     def create_key(self, session_hash: str, cell_id: str, timestamp: str) -> str:
-        # Include session_hash in key for session isolation
+        # New session-prefixed key format for efficient session-scoped queries
+        # Format: cs:{session_hash}:{cell_id_hash}
+        cell_id_hash = md5(cell_id.encode()).hexdigest()
+        return f"cs:{session_hash}:{cell_id_hash}"
+    
+    def create_legacy_key(self, session_hash: str, cell_id: str, timestamp: str) -> str:
+        # Legacy key format for backward compatibility reads
         combined = f"{session_hash}:{cell_id}"
         return md5(combined.encode()).hexdigest()
     
@@ -36,8 +42,15 @@ class RedisClient:
     
     async def get_cell(self, session_hash: str, cell_id: str, cell_timestamp: str) -> Optional[str]:
         try:
-            key_pattern = self.create_key(session_hash, cell_id, cell_timestamp)
-            data = await self.client.hgetall(key_pattern)
+            # Try new key format first
+            key = self.create_key(session_hash, cell_id, cell_timestamp)
+            data = await self.client.hgetall(key)
+            
+            # Fall back to legacy key if not found
+            if not data:
+                legacy_key = self.create_legacy_key(session_hash, cell_id, cell_timestamp)
+                data = await self.client.hgetall(legacy_key)
+            
             if not data:
                 return None
             # Redis returns bytes, decode to string
@@ -48,35 +61,71 @@ class RedisClient:
         
     async def delete_cell(self, session_hash: str, cell_id: str, cell_timestamp: str) -> bool:
         try:
-            key_pattern = self.create_key(session_hash, cell_id, cell_timestamp)
-            result = await self.client.delete(key_pattern)
-            return result == 1
+            # Try new key format first
+            key = self.create_key(session_hash, cell_id, cell_timestamp)
+            result = await self.client.delete(key)
+            
+            # If not found, try legacy key
+            if result == 0:
+                legacy_key = self.create_legacy_key(session_hash, cell_id, cell_timestamp)
+                result = await self.client.delete(legacy_key)
+            
+            return result >= 1
         except Exception as e:
             print(f"Error deleting cell: {e}")
             return False
     
     async def update_cell(self, session_hash: str, cell_id: str, cell_data: str, timestamp: str) -> bool:
         try:
-            key_pattern = self.create_key(session_hash, cell_id, timestamp)
-            exists = await self.client.exists(key_pattern)
+            key = self.create_key(session_hash, cell_id, timestamp)
+            exists = await self.client.exists(key)
+            
+            # Check legacy key if new key doesn't exist
+            if not exists:
+                legacy_key = self.create_legacy_key(session_hash, cell_id, timestamp)
+                exists = await self.client.exists(legacy_key)
+                # If legacy key exists, migrate to new format
+                if exists:
+                    key = self.create_key(session_hash, cell_id, timestamp)
+            
             if not exists:
                 result = await self.add_cell(session_hash, cell_id, cell_data, timestamp)
                 return result
-            await self.client.hset(key_pattern, mapping={"data": cell_data, "timestamp": timestamp})
+            
+            await self.client.hset(key, mapping={"data": cell_data, "timestamp": timestamp})
             return True
         except Exception as e:
             print(f"Error updating cell: {e}")
             return False
     
-    async def get_all_cell_ids(self) -> List[str]:
+    async def get_all_cell_ids(self, session_hash: Optional[str] = None) -> List[str]:
+        """
+        Get all cell IDs, optionally filtered by session.
+        
+        Args:
+            session_hash: If provided, return only cell IDs for this session.
+                         If None, return all cell IDs (legacy behavior).
+        
+        Returns:
+            List of unique cell IDs
+        """
         try:
-            keys = await self.client.keys('*')
+            if session_hash:
+                # Session-scoped query using new key format
+                pattern = f"cs:{session_hash}:*"
+            else:
+                # Global query for backward compatibility
+                pattern = '*'
+            
+            keys = await self.client.keys(pattern)
             cell_ids = set()
+            
             for key in keys:
                 data = await self.client.hgetall(key)
                 cell_id = data.get(b'cell_id', b'').decode('utf-8')
                 if cell_id:
                     cell_ids.add(cell_id)
+            
             return list(cell_ids)
         except Exception as e:
             print(f"Error retrieving all cell IDs: {e}")
