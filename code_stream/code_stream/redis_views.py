@@ -4,17 +4,12 @@ import tornado
 from .redis_client import redis_client
 
 '''
-Temporary disabling authentication for easier testing.
-Remember to re-enable it before production deployment.
-Todo: Add authentication back.
-'''
-
-'''
 CRUD API Handlers for managing code cells in Redis.
+Authentication is enabled for all endpoints.
 '''
 
 class PushCellHandler(APIHandler):
-    # @tornado.web.authenticated
+    @tornado.web.authenticated
     async def post(self, session_hash: str):
         data = self.get_json_body()
 
@@ -34,7 +29,7 @@ class PushCellHandler(APIHandler):
     
 
 class GetCellHandler(APIHandler):
-    # @tornado.web.authenticated
+    @tornado.web.authenticated
     async def get(self, session_hash: str):
         cell_id = self.get_query_argument("cell_id", None)
         cell_timestamp = self.get_query_argument("cell_timestamp", None)
@@ -54,7 +49,7 @@ class GetCellHandler(APIHandler):
         self.finish({"status": "success", "data": cell_data})
 
 class UpdateCellHandler(APIHandler):
-    # @tornado.web.authenticated
+    @tornado.web.authenticated
     async def post(self, session_hash: str):
         data = self.get_json_body()
 
@@ -78,7 +73,7 @@ class UpdateCellHandler(APIHandler):
 
 
 class DeleteCellHandler(APIHandler):
-    # @tornado.web.authenticated
+    @tornado.web.authenticated
     async def post(self, session_hash: str):
         data = self.get_json_body()
 
@@ -100,8 +95,15 @@ class DeleteCellHandler(APIHandler):
         self.finish({"status": "success", "message": "Cell content deleted from channel."})
 
 class GetAllCellIDsHandler(APIHandler):
-    # @tornado.web.authenticated
-    async def get(self):
-        cell_ids = await redis_client.get_all_cell_ids()
-        print("Get all cell IDs success:", cell_ids)
+    """
+    Legacy handler for getting all cell IDs.
+    NOTE: This is no longer used - UnifiedGetAllCellIDsHandler is used instead.
+    Kept for backward compatibility if directly imported.
+    """
+    @tornado.web.authenticated
+    async def get(self, session_hash: str = ""):
+        # Support optional session hash
+        session_hash_param = session_hash if session_hash else None
+        cell_ids = await redis_client.get_all_cell_ids(session_hash_param)
+        print(f"Get all cell IDs success (session={session_hash_param}):", cell_ids)
         self.finish({"status": "success", "data": cell_ids})

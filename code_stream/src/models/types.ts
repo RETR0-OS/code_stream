@@ -36,6 +36,7 @@ export interface INotebookMetadata {
   code_stream?: {
     session_hash: string;
     created_at: number;
+    teacher_base_url?: string; // Display only, token never stored here
   };
 }
 
@@ -114,7 +115,8 @@ export interface ISessionInfo {
  */
 export const STORAGE_KEYS = {
   ROLE: 'code_stream_role',
-  SESSION_HASH: 'code_stream_session_hash'
+  SESSION_HASH: 'code_stream_session_hash',
+  TEACHER_BASE_URL: 'code_stream_teacher_base_url'
 } as const;
 
 /**
@@ -126,3 +128,31 @@ export const DEFAULTS = {
   SUCCESS_DISPLAY_DURATION: 2000, // 2 seconds
   HASH_LENGTH: 6
 } as const;
+
+/**
+ * Teacher server configuration (for students)
+ */
+export interface ITeacherServerConfig {
+  teacher_base_url: string;
+  teacher_token?: string; // Optional, never persisted in localStorage
+}
+
+/**
+ * API response for config endpoints
+ */
+export interface IConfigResponse {
+  status: 'success' | 'error';
+  data?: {
+    teacher_base_url: string | null;
+    has_token: boolean;
+  };
+  message?: string;
+}
+
+/**
+ * API response for test connection
+ */
+export interface ITestConnectionResponse {
+  status: 'success' | 'error';
+  message: string;
+}
