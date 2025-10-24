@@ -6,7 +6,6 @@ import tornado
 
 from .redis_views import PushCellHandler, GetCellHandler, UpdateCellHandler, DeleteCellHandler, GetAllCellIDsHandler
 from .config_views import ConfigHandler, TestConnectionHandler
-from .proxy_views import ProxyGetAllCellIDsHandler, ProxyGetCellHandler
 from .unified_views import UnifiedGetAllCellIDsHandler, UnifiedGetCellHandler
 
 
