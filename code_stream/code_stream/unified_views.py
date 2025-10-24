@@ -1,6 +1,8 @@
 """
-Proxy handlers for Code Stream extension.
-Student servers proxy GET requests to teacher's Jupyter server.
+Unified handlers for Code Stream extension.
+Auto-detects teacher/student mode and routes requests appropriately.
+- Teacher mode: Direct Redis access
+- Student mode: Proxy to teacher server
 """
 
 import json
@@ -10,42 +12,54 @@ import tornado
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPError
 
 from .config_store import config_store
+from .redis_client import redis_client
 
 
-class ProxyGetAllCellIDsHandler(APIHandler):
-    """Proxy handler for get-all-cell-ids endpoint."""
+class UnifiedGetAllCellIDsHandler(APIHandler):
+    """
+    Unified handler for get-all-cell-ids endpoint.
+    Auto-detects mode based on teacher config presence.
+    """
 
     @tornado.web.authenticated
     async def get(self):
         """
-        Proxy GET request to teacher server for all cell IDs.
+        Get all cell IDs - auto-detects teacher/student mode.
+
+        Teacher mode (no config): Query Redis directly
+        Student mode (has config): Proxy to teacher server
 
         Returns:
             {"status": "success", "data": [...]} or error response
         """
         user_id = self.current_user
-
-        # Load teacher server config
         config = config_store.get_config(user_id)
 
-        if not config:
-            self.set_status(428)  # Precondition Required
+        # Student mode: Proxy to teacher server if config exists
+        if config and config.get("teacher_base_url"):
+            await self._handle_student_mode(config)
+        else:
+            # Teacher mode: Direct Redis access
+            await self._handle_teacher_mode()
+
+    async def _handle_teacher_mode(self):
+        """Teacher mode: Query Redis directly."""
+        try:
+            cell_ids = await redis_client.get_all_cell_ids()
+            print("Code Stream (Teacher): Get all cell IDs success:", cell_ids)
+            self.finish({"status": "success", "data": cell_ids})
+        except Exception as e:
+            print(f"Code Stream (Teacher): Error getting cell IDs from Redis: {e}")
+            self.set_status(500)
             self.finish({
                 "status": "error",
-                "message": "Teacher server not configured. Please configure teacher server URL in the sidebar."
+                "message": "Failed to retrieve cell IDs from Redis"
             })
-            return
 
+    async def _handle_student_mode(self, config: dict):
+        """Student mode: Proxy request to teacher server."""
         teacher_base_url = config.get("teacher_base_url")
         teacher_token = config.get("teacher_token")
-
-        if not teacher_base_url:
-            self.set_status(428)
-            self.finish({
-                "status": "error",
-                "message": "Teacher base URL is missing from configuration"
-            })
-            return
 
         # Build proxy URL
         proxy_url = f"{teacher_base_url}/code_stream/get-all-cell-ids/"
@@ -53,7 +67,6 @@ class ProxyGetAllCellIDsHandler(APIHandler):
         # Build request headers
         headers = {}
         if teacher_token:
-            # Send token as Authorization header
             headers['Authorization'] = f'token {teacher_token}'
 
         try:
@@ -105,12 +118,6 @@ class ProxyGetAllCellIDsHandler(APIHandler):
                 "status": "error",
                 "message": "Teacher server endpoint not found. Please verify the configuration."
             })
-        elif error.code == 428:
-            self.set_status(428)
-            self.finish({
-                "status": "error",
-                "message": "Teacher server requires configuration. Please contact your teacher."
-            })
         else:
             self.set_status(502)
             self.finish({
@@ -142,13 +149,19 @@ class ProxyGetAllCellIDsHandler(APIHandler):
             })
 
 
-class ProxyGetCellHandler(APIHandler):
-    """Proxy handler for get-cell endpoint."""
+class UnifiedGetCellHandler(APIHandler):
+    """
+    Unified handler for get-cell endpoint.
+    Auto-detects mode based on teacher config presence.
+    """
 
     @tornado.web.authenticated
     async def get(self, session_hash: str):
         """
-        Proxy GET request to teacher server for specific cell.
+        Get cell content - auto-detects teacher/student mode.
+
+        Teacher mode (no config): Query Redis directly
+        Student mode (has config): Proxy to teacher server
 
         Args:
             session_hash: Session hash (6-character code)
@@ -174,27 +187,44 @@ class ProxyGetCellHandler(APIHandler):
             })
             return
 
-        # Load teacher server config
         config = config_store.get_config(user_id)
 
-        if not config:
-            self.set_status(428)  # Precondition Required
+        # Student mode: Proxy to teacher server if config exists
+        if config and config.get("teacher_base_url"):
+            await self._handle_student_mode(session_hash, cell_id, cell_timestamp, config)
+        else:
+            # Teacher mode: Direct Redis access
+            await self._handle_teacher_mode(session_hash, cell_id, cell_timestamp)
+
+    async def _handle_teacher_mode(self, session_hash: str, cell_id: str, cell_timestamp: str):
+        """Teacher mode: Query Redis directly."""
+        try:
+            cell_data = await redis_client.get_cell(
+                session_hash=session_hash,
+                cell_id=cell_id,
+                cell_timestamp=cell_timestamp
+            )
+
+            if cell_data is None:
+                self.set_status(404)
+                self.finish({"status": "error", "message": "Cell not found."})
+                return
+
+            print("Code Stream (Teacher): Cell get success:", cell_data)
+            self.finish({"status": "success", "data": cell_data})
+
+        except Exception as e:
+            print(f"Code Stream (Teacher): Error getting cell from Redis: {e}")
+            self.set_status(500)
             self.finish({
                 "status": "error",
-                "message": "Teacher server not configured. Please configure teacher server URL in the sidebar."
+                "message": "Failed to retrieve cell from Redis"
             })
-            return
 
+    async def _handle_student_mode(self, session_hash: str, cell_id: str, cell_timestamp: str, config: dict):
+        """Student mode: Proxy request to teacher server."""
         teacher_base_url = config.get("teacher_base_url")
         teacher_token = config.get("teacher_token")
-
-        if not teacher_base_url:
-            self.set_status(428)
-            self.finish({
-                "status": "error",
-                "message": "Teacher base URL is missing from configuration"
-            })
-            return
 
         # Build proxy URL with query parameters
         query_params = urlencode({
@@ -206,7 +236,6 @@ class ProxyGetCellHandler(APIHandler):
         # Build request headers
         headers = {}
         if teacher_token:
-            # Send token as Authorization header
             headers['Authorization'] = f'token {teacher_token}'
 
         try:
@@ -257,12 +286,6 @@ class ProxyGetCellHandler(APIHandler):
             self.finish({
                 "status": "error",
                 "message": "Cell not found on teacher server."
-            })
-        elif error.code == 428:
-            self.set_status(428)
-            self.finish({
-                "status": "error",
-                "message": "Teacher server requires configuration. Please contact your teacher."
             })
         else:
             self.set_status(502)

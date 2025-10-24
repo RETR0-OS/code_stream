@@ -7,6 +7,7 @@ import tornado
 from .redis_views import PushCellHandler, GetCellHandler, UpdateCellHandler, DeleteCellHandler, GetAllCellIDsHandler
 from .config_views import ConfigHandler, TestConnectionHandler
 from .proxy_views import ProxyGetAllCellIDsHandler, ProxyGetCellHandler
+from .unified_views import UnifiedGetAllCellIDsHandler, UnifiedGetCellHandler
 
 
 class RouteHandler(APIHandler):
@@ -44,15 +45,15 @@ def setup_handlers(web_app):
 
     handlers = [
         (route_pattern, RouteHandler),
-        # Teacher endpoints
+        # Teacher endpoints (direct Redis write operations)
         (add_cell, PushCellHandler),
         (update_cell, UpdateCellHandler),
         (delete_cell, DeleteCellHandler),
         # Configuration endpoints
         (config_endpoint, ConfigHandler),
         (test_endpoint, TestConnectionHandler),
-        # Proxy endpoints (replace direct Redis handlers for students)
-        (proxy_get_all_cell_ids, ProxyGetAllCellIDsHandler),
-        (proxy_get_cell, ProxyGetCellHandler),
+        # Unified endpoints (auto-detect teacher/student mode for read operations)
+        (proxy_get_all_cell_ids, UnifiedGetAllCellIDsHandler),
+        (proxy_get_cell, UnifiedGetCellHandler),
     ]
     web_app.add_handlers(host_pattern, handlers)
