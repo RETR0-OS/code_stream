@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect } from 'react'
-import { FaPlay, FaUsers, FaCode, FaCheckCircle, FaToggleOn, FaToggleOff, FaChevronDown } from 'react-icons/fa'
+import { FaUsers, FaCode, FaCheckCircle, FaToggleOn, FaToggleOff, FaChevronDown } from 'react-icons/fa'
 
 const MockupDemo = () => {
   const [activeView, setActiveView] = useState<'teacher' | 'student'>('teacher')
