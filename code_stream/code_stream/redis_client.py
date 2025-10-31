@@ -215,14 +215,11 @@ class RedisClient:
     async def get_all_cell_ids(self, session_hash: Optional[str] = None) -> List[str]:
         """
         Get all cell IDs, optionally filtered by session.
-        
-        PERFORMANCE: Uses SCAN instead of KEYS for production-safe iteration.
-        KEYS command blocks Redis and should never be used in production.
-        
+
         Args:
             session_hash: If provided, return only cell IDs for this session.
                          If None, return all cell IDs (legacy behavior).
-        
+
         Returns:
             List of unique cell IDs
         """

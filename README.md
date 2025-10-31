@@ -1,96 +1,30 @@
-# JupyterLab Notebook Sync Extension
+# Code Stream - JupyterLab Cell Sync Extension
 
-A JupyterLab extension that enables real-time collaboration between teachers a   };
-   ```
+A JupyterLab extension that enables secure, proxy-based cell synchronization between teachers and students.
 
-3. **Request Sync** (when ready):
-   ```javascript
-   ws.send(JSON.stringify({
-       type: 'request_sync',
-       cell_id: 'cell_001'
-   }));
-   ```
+## Overview
 
-## Hash-Based Cell Sync (New Specification)
+Code Stream allows teachers to share code cells with students in real-time. Teachers create sessions and push cell content to Redis, while students connect to the teacher's server through a secure proxy to pull updates on demand.
 
-The extension now supports a simplified hash-based approach for direct teacher-to-student cell synchronization without session management.
+## Architecture
 
-### Configuration for Networked Setup
+### Proxy-Based Design (Current)
 
-When teacher and students are on the same network:
-
-1. **Teacher Setup**:
-   ```bash
-   # Start Redis server accessible from network
-   redis-server --bind 0.0.0.0 --port 6379
-   
-   # Set Redis URL (optional, defaults to localhost)
-   export REDIS_URL="redis://0.0.0.0:6379"
-   ```
-
-2. **Student Setup**:
-   ```bash
-   # Point to teacher's Redis server
-   export REDIS_URL="redis://192.168.1.42:6379"  # Replace with teacher's IP
-   ```
-
-### Hash-Based API Endpoints
-
-#### Teacher: Push Cell Content
-
-```bash
-POST /notebook-sync/hash/push-cell
-Content-Type: application/json
-
-{
-  "cell_id": "cell_001",
-  "created_at": "2025-01-15T10:30:00.000Z", 
-  "content": "print('Hello, students!')",
-  "ttl_seconds": 86400
-}
-
-# Response:
-{
-  "type": "push_confirmed_hash",
-  "cell_id": "cell_001", 
-  "created_at": "2025-01-15T10:30:00.000Z",
-  "hash_key": "a1b2c3d4",
-  "teacher_id": "teacher123"
-}
+```
+Teacher:
+  JupyterLab → Teacher's Jupyter Server → Redis (local)
+                         ↑
+                         | (HTTP GET requests proxied)
+                         |
+Student:
+  JupyterLab → Student's Jupyter Server (proxy) → Teacher's Jupyter Server
 ```
 
-#### Student: Request Cell Sync
-
-```bash
-POST /notebook-sync/hash/request-sync
-Content-Type: application/json
-
-{
-  "cell_id": "cell_001",
-  "created_at": "2025-01-15T10:30:00.000Z"
-}
-
-# Response:
-{
-  "type": "cell_sync_hash", 
-  "cell_id": "cell_001",
-  "content": "print('Hello, students!')",
-  "created_at": "2025-01-15T10:30:00.000Z",
-  "student_id": "student456" 
-}
-```
-
-### Hash Key Generation
-
-- Keys are generated using SHA256 hash of `cell_id:created_at`
-- Same cell_id + created_at always produces the same hash key
-- Enables deterministic retrieval without complex session management
-
-### Backward Compatibility
-
-- All existing session-based APIs remain functional
-- Hash-based methods are additive, not replacement
-- Can use both approaches simultaneouslys with request-based synchronization.
+**Key Benefits:**
+- No CORS issues (all requests go through local Jupyter server)
+- Teacher token stored securely server-side (never exposed to browser)
+- Clear separation: teachers write to Redis, students read via proxy
+- Centralized authentication and authorization control
 
 ## Features
 
@@ -101,8 +35,14 @@ Content-Type: application/json
 - **Persistent Updates**: Updates stored in Redis until students request them
 - **Production-Ready**: Connection pooling, non-blocking Redis operations, structured logging
 - **Performance Optimized**: SCAN-based iteration, efficient resource management
+- **Session-Based Collaboration**: Teachers create 6-character session codes, students join sessions
+- **Proxy Architecture**: Student servers proxy read requests to teacher server
+- **Secure Configuration**: Teacher URL and token stored server-side, not in browser
+- **Cell-Level Sync**: Teachers control which cells to sync; students preview and choose updates
+- **On-Demand Updates**: Students hover to preview, click to sync (no automatic overwrites)
+- **Metadata Persistence**: Session info and teacher URL stored in notebook metadata
 
-## Architecture
+## Installation
 
 - **Backend**: Tornado WebSocket handlers with Redis pub-sub
 - **Session Management**: In-memory connection tracking with Redis persistence
@@ -110,26 +50,26 @@ Content-Type: application/json
 - **Security**: Role-based permissions and input validation
 - **Performance**: Redis connection pooling, SCAN-based queries, structured logging
 - **Monitoring**: Comprehensive logging framework for debugging and production monitoring
+### Prerequisites
 
-## Installation
+- JupyterLab 3.x or 4.x
+- Python 3.8+
+- Redis server (for teachers only)
 
-### 1. Start Redis
+### 1. Start Redis (Teachers Only)
 
-Start Redis using Docker:
+Teachers need a running Redis server:
 
 ```bash
-# From the project root directory
-docker-compose up -d
-```
+# Using Docker
+docker run -d -p 6379:6379 redis:latest
 
-Or install Redis manually:
-```bash
-# On macOS
+# Or install locally
+# macOS
 brew install redis
 brew services start redis
 
-# On Ubuntu
-sudo apt update
+# Ubuntu
 sudo apt install redis-server
 sudo systemctl start redis
 ```
@@ -138,176 +78,140 @@ sudo systemctl start redis
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/jupyter-notebook-sync.git
-cd jupyter-notebook-sync
+git clone https://github.com/your-username/code_stream.git
+cd code_stream
 
 # Install in development mode
 pip install -e .
 
-# Enable the server extension
-jupyter server extension enable jupyter_notebook_sync
+# Build the extension
+jupyter labextension develop . --overwrite
 
-# Verify installation
-jupyter server extension list
-```
-
-### 3. Start JupyterLab
-
-```bash
-jupyter lab --autoreload
+# Start JupyterLab
+jupyter lab
 ```
 
 ## Usage
 
-### Teacher Workflow
+### For Teachers
 
-1. **Create Session**:
-   ```javascript
-   // Frontend JavaScript (connect to WebSocket)
-   const ws = new WebSocket('ws://localhost:8888/notebook-sync/ws');
-   
-   // Create session
-   ws.send(JSON.stringify({
-       type: 'create_session'
-   }));
-   ```
+1. **Start JupyterLab** with the extension installed
+2. **Open Code Stream sidebar** (left sidebar icon)
+3. **Session code is automatically created** and displayed
+4. **Share the session code** with students
+5. **Enable sync on cells** you want to share:
+   - Toggle sync button appears in cell toolbar
+   - Click to enable/disable sync for that cell
+6. **Students can now see and sync** your enabled cells
 
-2. **Push Cell Updates**:
-   ```javascript
-   ws.send(JSON.stringify({
-       type: 'push_cell',
-       cell_id: 'cell_001',
-       content: { source: 'print("Hello, students!")' },
-       metadata: { sync_allowed: true }
-   }));
-   ```
+**Teacher Workflow:**
+```python
+# In a cell, enable sync via the toggle button in toolbar
+print("Hello, students!")
 
-3. **Toggle Sync Permissions**:
-   ```javascript
-   ws.send(JSON.stringify({
-       type: 'toggle_sync',
-       cell_id: 'cell_001',
-       sync_allowed: false
-   }));
-   ```
+# When you update the cell, students will see the update available
+print("Updated content here")
+```
 
-### Student Workflow
+### For Students
 
-1. **Join Session**:
-   ```javascript
-   ws.send(JSON.stringify({
-       type: 'join_session',
-       session_code: 'ABC123'
-   }));
-   ```
+1. **Start JupyterLab** with the extension installed
+2. **Open Code Stream sidebar**
+3. **Configure Teacher Server:**
+   - Enter teacher's Jupyter server URL (e.g., `http://192.168.1.10:8888`)
+   - Optionally enter teacher's token if required
+   - Click **Save**
+   - Click **Test Connection** to verify
+4. **Join Session:**
+   - Enter the 6-character session code from your teacher
+   - Click **Join**
+5. **Sync Cells:**
+   - Hover over the refresh icon in cell toolbar to see available cells
+   - Preview shows content on hover
+   - Click a cell to sync/replace content
 
-2. **Listen for Notifications**:
-   ```javascript
-   ws.onmessage = (event) => {
-       const data = JSON.parse(event.data);
-       
-       if (data.type === 'update_available') {
-           // Show UI indicator that update is available
-           showUpdateNotification(data.cell_id, data.timestamp);
-       }
-   };
-   ```
-
-3. **Request Sync** (when student chooses):
-   ```javascript
-   ws.send(JSON.stringify({
-       type: 'request_sync',
-       cell_id: 'cell_001'
-   }));
-   ```
-
-## Message Protocol
-
-### Teacher Messages
-
-- `create_session`: Create new session
-- `push_cell`: Push cell content (stores in Redis, notifies students)
-- `toggle_sync`: Enable/disable sync for specific cells
-- `end_session`: End the session
-
-### Student Messages
-
-- `join_session`: Join existing session with code
-- `request_sync`: Request specific cell content
-
-### Server Responses
-
-- `session_created`: Session creation confirmation
-- `session_joined`: Session join confirmation
-- `update_available`: Notification of available update (NOT content)
-- `cell_content_update`: Actual cell content (only after request)
-- `sync_allowed_update`: Sync permission changes
-- `error`: Error messages
+**Student Workflow:**
+```python
+# In an empty cell, hover over the refresh icon
+# Preview available teacher cells
+# Click to sync and replace with teacher's content
+```
 
 ## Configuration
 
-### Redis Configuration
+### Teacher Server URL (Students)
 
-Set Redis URL in environment variables:
+Students must configure their teacher's Jupyter server URL. This URL should be:
+- Accessible from the student's network
+- Include the full base URL (e.g., `http://192.168.1.10:8888`)
+- Use HTTPS in production environments
+
+### Authentication
+
+Teachers can secure their Jupyter server with a token. Students will need to:
+1. Get the token from their teacher
+2. Enter it once in the configuration UI
+3. Token is stored securely server-side (never in browser)
+
+To find your Jupyter token (teachers):
+```bash
+jupyter server list
+# Or check server logs when starting JupyterLab
+```
+
+### Environment Variables
+
+Teachers can configure Redis connection:
 
 ```bash
-export REDIS_URL="redis://localhost:6379"
+# Default: localhost:6379
+export REDIS_HOST="localhost"
+export REDIS_PORT="6379"
+export REDIS_DB="0"
 ```
 
-### Extension Settings
+## API Endpoints
 
-The extension can be configured via Jupyter configuration:
+### Teacher Endpoints (Write Operations)
 
-```python
-# jupyter_lab_config.py
-c.NotebookSyncExtensionApp.redis_url = "redis://localhost:6379"
+```http
+POST /code_stream/{hash}/push-cell/
+POST /code_stream/{hash}/update/
+POST /code_stream/{hash}/delete/
 ```
 
-## Development
+### Student Endpoints (Configuration)
 
-### Setup Development Environment
-
-```bash
-# Install in development mode
-pip install -e .
-
-# Install development dependencies
-pip install -e ".[test]"
-
-# Run tests
-pytest
+```http
+GET  /code_stream/config
+POST /code_stream/config
+POST /code_stream/test
 ```
 
-### Running Tests
+### Student Endpoints (Proxy to Teacher)
 
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=jupyter_notebook_sync
-
-# Run specific test
-pytest tests/test_handlers.py::test_websocket_connection
-```
-
-### Code Structure
-
-```
-jupyter_notebook_sync/
-├── __init__.py          # Extension entry point
-├── handlers.py          # WebSocket and HTTP handlers
-├── session_manager.py   # Session and connection management
-└── redis_client.py      # Redis client and operations
+```http
+GET /code_stream/get-all-cell-ids/
+GET /code_stream/{hash}/get-cell/?cell_id=...&cell_timestamp=...
 ```
 
 ## Security Considerations
 
-- **Origin Checking**: Implement proper origin validation for production
-- **Authentication**: Integrate with JupyterLab's authentication system
-- **Input Validation**: All message content is validated and sanitized
-- **Rate Limiting**: Consider adding rate limiting for WebSocket messages
-- **Redis Security**: Use Redis AUTH and TLS in production
+### Authentication
+- All endpoints require Jupyter authentication (`@tornado.web.authenticated`)
+- Teacher token never exposed in responses, logs, or client storage
+- Students must be authenticated to configure or use proxy
+
+### Network Security
+- Use HTTPS for teacher server in production
+- Validate teacher URL scheme (http/https only)
+- No credentials allowed in URLs (user:pass@host forbidden)
+- Optional: Restrict to private network subnets (RFC1918)
+
+### Token Handling
+- Teacher token sent once via POST, stored server-side only
+- Token masked in responses (returns `has_token: boolean`)
+- Never logged or included in error messages
 
 ## Logging and Monitoring
 
@@ -363,53 +267,131 @@ See [LOGGING.md](LOGGING.md) for complete logging documentation.
 
 ## Troubleshooting
 
-### Redis Connection Issues
+### Students Cannot Connect
+
+**Problem**: "Connection to teacher server timed out"
+
+**Solutions**:
+1. Verify teacher's Jupyter server is running
+2. Check teacher's firewall allows incoming connections
+3. Ensure both teacher and student are on the same network (or use VPN/tunnel)
+4. Test URL directly in browser: `http://teacher-ip:8888`
+
+### Authentication Errors
+
+**Problem**: "Authentication failed with teacher server"
+
+**Solutions**:
+1. Get the correct token from teacher: `jupyter server list`
+2. Re-enter token in student configuration
+3. Verify teacher's server isn't using additional auth layers
+
+### No Cells Available
+
+**Problem**: Student sees "No cells available to sync"
+
+**Solutions**:
+1. Teacher: Ensure sync is enabled on cells (toggle button in toolbar)
+2. Teacher: Verify Redis is running: `redis-cli ping`
+3. Student: Refresh by closing and reopening dropdown
+
+### CORS Errors (Should Not Occur)
+
+If you see CORS errors, the proxy is not working correctly. This architecture eliminates CORS by proxying through the student's local server.
+
+**Debug**:
+1. Check student's Jupyter logs for proxy errors
+2. Verify teacher URL is configured correctly
+3. Test connection using "Test Connection" button
+
+## Development
+
+### Setup Development Environment
 
 ```bash
-# Check Redis status
-redis-cli ping
+# Install in development mode
+pip install -e .
 
-# Check Redis logs
-docker logs jupyter-sync-redis
+# Install TypeScript dependencies
+npm install
+
+# Build the extension
+jupyter labextension develop . --overwrite
+
+# Watch for changes (TypeScript)
+npm run watch
+
+# In another terminal, start JupyterLab
+jupyter lab --autoreload
 ```
 
-### Extension Not Loading
+### Project Structure
+
+```
+code_stream/
+├── code_stream/                 # Python package (backend)
+│   ├── __init__.py
+│   ├── handlers.py              # Route registration
+│   ├── redis_client.py          # Redis operations (teacher)
+│   ├── redis_views.py           # Teacher write handlers
+│   ├── config_store.py          # Secure config storage
+│   ├── config_views.py          # Config API handlers
+│   └── proxy_views.py           # Proxy GET handlers (student)
+│
+├── src/                         # TypeScript package (frontend)
+│   ├── index.ts                 # Extension entry point
+│   ├── handler.ts               # API request wrapper
+│   ├── models/
+│   │   └── types.ts             # TypeScript interfaces
+│   ├── services/
+│   │   ├── SessionManager.ts    # Session & config state
+│   │   ├── SyncService.ts       # API client
+│   │   └── RoleManager.ts       # Teacher/student role
+│   └── components/
+│       ├── SessionPanel.ts      # Sidebar UI
+│       ├── UpdateIcon.ts        # Cell refresh button
+│       └── CellSyncDropdown.ts  # Cell selection dropdown
+│
+├── style/                       # CSS styles
+├── package.json                 # NPM dependencies
+└── setup.py                     # Python package metadata
+```
+
+### Running Tests
 
 ```bash
-# Check if extension is enabled
-jupyter server extension list
+# Python tests
+pytest
 
-# Check JupyterLab logs
-jupyter lab --debug
+# TypeScript tests (if configured)
+npm test
 ```
 
-### WebSocket Connection Failed
+## Migration Notes (Version 2.0)
 
-1. Check if extension is properly registered
-2. Verify Redis is running
-3. Check browser console for errors
-4. Verify WebSocket URL in client code
+### Breaking Changes
 
-## API Reference
+Students **must now configure the teacher server URL** before syncing. There is no fallback to local Redis or direct cross-origin teacher access.
 
-### HTTP Endpoints
+### Migration Steps for Students
 
-- `GET /notebook-sync/status`: Extension status and health check
+1. Upgrade extension: `pip install --upgrade code_stream`
+2. Open Code Stream sidebar
+3. Configure teacher server:
+   - Enter teacher's Jupyter URL
+   - Save and test connection
+4. Join session as before
 
-### WebSocket Endpoint
+### Migration Steps for Teachers
 
-- `ws://localhost:8888/notebook-sync/ws`: Main WebSocket connection
-
-### Redis Keys
-
-- `session:{session_code}`: Session metadata
-- `pending_update:{session_code}:{cell_id}`: Stored cell updates
-- Channel: `sync_session_{session_code}`: Pub-sub notifications
+**No changes required.** Teachers continue using the extension as before.
 
 ## Contributing
 
+Contributions are welcome! Please:
+
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
 4. Add tests
 5. Submit a pull request
@@ -417,3 +399,29 @@ jupyter lab --debug
 ## License
 
 BSD 3-Clause License
+
+## Support
+
+- **Issues**: https://github.com/your-username/code_stream/issues
+- **Discussions**: https://github.com/your-username/code_stream/discussions
+- **Documentation**: https://code-stream.readthedocs.io (coming soon)
+
+## Changelog
+
+### Version 2.0.0 (Current)
+
+- **BREAKING**: Students must configure teacher server URL
+- **NEW**: Proxy-based architecture eliminates CORS issues
+- **NEW**: Server-side teacher token storage (enhanced security)
+- **NEW**: Configuration UI in student sidebar
+- **NEW**: Test connection button for students
+- **IMPROVED**: Re-enabled authentication on all endpoints
+- **REMOVED**: Direct cross-origin requests from student browsers
+- **REMOVED**: Local Redis fallback for students
+
+### Version 1.0.0
+
+- Initial release
+- Basic teacher-student cell synchronization
+- Redis-based storage
+- Session management
