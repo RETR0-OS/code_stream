@@ -4,10 +4,14 @@ Stores per-user teacher server configuration securely.
 """
 
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Optional, Dict, Any, Union
 from jupyter_core.paths import jupyter_data_dir
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
 
 
 class ConfigStore:
@@ -24,8 +28,9 @@ class ConfigStore:
         # Set directory permissions to 700 (owner read/write/execute only)
         try:
             os.chmod(self.config_dir, 0o700)
+            logger.info(f"Config directory initialized at {self.config_dir}")
         except Exception as e:
-            print(f"Warning: Could not set directory permissions: {e}")
+            logger.warning(f"Could not set directory permissions: {e}")
 
     def _get_config_path(self, user_id: Union[str, Any]) -> Path:
         """
@@ -62,9 +67,13 @@ class ConfigStore:
         try:
             with open(config_path, 'r') as f:
                 config = json.load(f)
+            logger.debug(f"Retrieved config for user {user_id}")
             return config
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in config file for user {user_id}: {e}")
+            return None
         except Exception as e:
-            print(f"Error reading config for user {user_id}: {e}")
+            logger.error(f"Error reading config for user {user_id}: {e}")
             return None
 
     def set_config(self, user_id: Union[str, Any], config: Dict[str, Any]) -> bool:
@@ -91,10 +100,10 @@ class ConfigStore:
             # Set file permissions to 600 (owner read/write only)
             os.chmod(config_path, 0o600)
 
-            print(f"Saved config for user {user_id}")
+            logger.info(f"Saved config for user {user_id}")
             return True
         except Exception as e:
-            print(f"Error saving config for user {user_id}: {e}")
+            logger.error(f"Error saving config for user {user_id}: {e}")
             return False
 
     def delete_config(self, user_id: Union[str, Any]) -> bool:
@@ -114,10 +123,10 @@ class ConfigStore:
 
         try:
             config_path.unlink()
-            print(f"Deleted config for user {user_id}")
+            logger.info(f"Deleted config for user {user_id}")
             return True
         except Exception as e:
-            print(f"Error deleting config for user {user_id}: {e}")
+            logger.error(f"Error deleting config for user {user_id}: {e}")
             return False
 
     def get_teacher_url(self, user_id: Union[str, Any]) -> Optional[str]:

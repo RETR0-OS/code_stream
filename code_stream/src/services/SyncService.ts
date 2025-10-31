@@ -15,6 +15,7 @@ import {
   IConfigResponse,
   ITestConnectionResponse
 } from '../models/types';
+import { logger } from '../utils/logger';
 
 /**
  * Service for syncing cell data with backend
@@ -32,8 +33,8 @@ export class SyncService {
   ): Promise<IPushCellResponse> {
     try {
       const endpoint = `${hash}/push-cell/`;
-      console.log(`Code Stream: Calling push-cell API - endpoint: ${endpoint}`);
-      console.log(`Code Stream: Cell data:`, {
+      logger.debug(`Calling push-cell API - endpoint: ${endpoint}`);
+      logger.debug('Cell data:', {
         cell_id: cellData.cell_id,
         cell_timestamp: cellData.cell_timestamp,
         content_length: cellData.cell_content.length
@@ -48,10 +49,10 @@ export class SyncService {
         })
       });
 
-      console.log(`Code Stream: Successfully pushed cell ${cellData.cell_id} to session ${hash}`, response);
+      logger.info(`Successfully pushed cell ${cellData.cell_id} to session ${hash}`);
       return response;
     } catch (error) {
-      console.error('Code Stream: Error pushing cell:', error);
+      logger.error('Error pushing cell:', error);
       throw error;
     }
   }
@@ -74,10 +75,10 @@ export class SyncService {
         method: 'GET'
       });
 
-      console.log(`Code Stream: Retrieved cell ${cellId} from session ${hash}`);
+      logger.debug(`Retrieved cell ${cellId} from session ${hash}`);
       return response;
     } catch (error) {
-      console.error('Code Stream: Error getting cell:', error);
+      logger.error('Error getting cell:', error);
       throw error;
     }
   }
@@ -103,10 +104,10 @@ export class SyncService {
         })
       });
 
-      console.log(`Code Stream: Updated cell ${cellData.cell_id} in session ${hash}`);
+      logger.debug(`Updated cell ${cellData.cell_id} in session ${hash}`);
       return response;
     } catch (error) {
-      console.error('Code Stream: Error updating cell:', error);
+      logger.error('Error updating cell:', error);
       throw error;
     }
   }
@@ -133,10 +134,10 @@ export class SyncService {
         })
       });
 
-      console.log(`Code Stream: Deleted cell ${cellId} from session ${hash}`);
+      logger.debug(`Deleted cell ${cellId} from session ${hash}`);
       return response;
     } catch (error) {
-      console.error('Code Stream: Error deleting cell:', error);
+      logger.error('Error deleting cell:', error);
       throw error;
     }
   }
@@ -154,10 +155,10 @@ export class SyncService {
         method: 'GET'
       });
 
-      console.log(`Code Stream: Retrieved all cell IDs for session ${hash}`, response);
+      logger.debug(`Retrieved all cell IDs for session ${hash}`);
       return response;
     } catch (error) {
-      console.error('Code Stream: Error getting all cell IDs:', error);
+      logger.error('Error getting all cell IDs:', error);
       throw error;
     }
   }
@@ -221,10 +222,10 @@ export class SyncService {
         method: 'GET'
       });
 
-      console.log(`Code Stream: Retrieved config`, response);
+      logger.debug('Retrieved config');
       return response;
     } catch (error) {
-      console.error('Code Stream: Error getting config:', error);
+      logger.error('Error getting config:', error);
       throw error;
     }
   }
@@ -242,10 +243,10 @@ export class SyncService {
         body: JSON.stringify(config)
       });
 
-      console.log(`Code Stream: Set config successfully`);
+      logger.info('Set config successfully');
       return response;
     } catch (error) {
-      console.error('Code Stream: Error setting config:', error);
+      logger.error('Error setting config:', error);
       throw error;
     }
   }
@@ -261,10 +262,10 @@ export class SyncService {
         method: 'POST'
       });
 
-      console.log(`Code Stream: Test connection result:`, response);
+      logger.debug('Test connection result:', response);
       return response;
     } catch (error) {
-      console.error('Code Stream: Error testing connection:', error);
+      logger.error('Error testing connection:', error);
       throw error;
     }
   }

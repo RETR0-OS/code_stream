@@ -1,29 +1,89 @@
 import json
+import logging
 from datetime import datetime
 from hashlib import md5
 from typing import List, Optional, Any, Dict
 import redis.asyncio as async_redis
 
+# Configure logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
 
 class RedisClient:
+    """
+    Redis client with connection pooling and proper error handling.
+    
+    This client uses connection pooling for better performance and
+    implements SCAN instead of KEYS for production-safe operations.
+    """
 
-    def __init__(self, host: str = 'localhost', port: int = 6379, db: int = 0,):
-
-        self.client = async_redis.Redis(host=host, port=port, db=db)
+    def __init__(self, host: str = 'localhost', port: int = 6379, db: int = 0, max_connections: int = 10):
+        """
+        Initialize Redis client with connection pooling.
+        
+        Args:
+            host: Redis server hostname
+            port: Redis server port
+            db: Redis database number
+            max_connections: Maximum number of connections in the pool
+        """
+        # Create connection pool for better performance
+        self.pool = async_redis.ConnectionPool(
+            host=host,
+            port=port,
+            db=db,
+            max_connections=max_connections,
+            decode_responses=False  # We handle decoding explicitly
+        )
+        self.client = async_redis.Redis(connection_pool=self.pool)
 
     
     def create_key(self, session_hash: str, cell_id: str, timestamp: str) -> str:
+        """
+        Create session-prefixed key for efficient session-scoped queries.
+        
+        Args:
+            session_hash: Session identifier
+            cell_id: Cell identifier
+            timestamp: Timestamp (not used in current implementation)
+            
+        Returns:
+            Key in format: cs:{session_hash}:{cell_id_hash}
+        """
         # New session-prefixed key format for efficient session-scoped queries
         # Format: cs:{session_hash}:{cell_id_hash}
         cell_id_hash = md5(cell_id.encode()).hexdigest()
         return f"cs:{session_hash}:{cell_id_hash}"
     
     def create_legacy_key(self, session_hash: str, cell_id: str, timestamp: str) -> str:
+        """
+        Create legacy key format for backward compatibility.
+        
+        Args:
+            session_hash: Session identifier
+            cell_id: Cell identifier
+            timestamp: Timestamp (not used in current implementation)
+            
+        Returns:
+            MD5 hash of session:cell_id combination
+        """
         # Legacy key format for backward compatibility reads
         combined = f"{session_hash}:{cell_id}"
         return md5(combined.encode()).hexdigest()
     
     async def add_cell(self, session_hash: str, cell_id: str, cell_data: str, timestamp: str) -> bool:
+        """
+        Add a new cell to Redis.
+        
+        Args:
+            session_hash: Session identifier
+            cell_id: Cell identifier
+            cell_data: Cell content
+            timestamp: Cell timestamp
+            
+        Returns:
+            True if successful, False otherwise
+        """
         try:
             key = self.create_key(session_hash, cell_id, timestamp)
 
@@ -34,13 +94,27 @@ class RedisClient:
             }
 
             await self.client.hset(key, mapping=data)
-
+            logger.info(f"Successfully added cell {cell_id} to session {session_hash}")
             return True
+        except async_redis.RedisError as e:
+            logger.error(f"Redis error adding cell {cell_id}: {e}")
+            return False
         except Exception as e:
-            print(f"Error adding cell: {e}")
+            logger.error(f"Unexpected error adding cell {cell_id}: {e}")
             return False
     
     async def get_cell(self, session_hash: str, cell_id: str, cell_timestamp: str) -> Optional[str]:
+        """
+        Retrieve cell data from Redis.
+        
+        Args:
+            session_hash: Session identifier
+            cell_id: Cell identifier
+            cell_timestamp: Cell timestamp
+            
+        Returns:
+            Cell data as string, or None if not found
+        """
         try:
             # Try new key format first
             key = self.create_key(session_hash, cell_id, cell_timestamp)
@@ -52,14 +126,31 @@ class RedisClient:
                 data = await self.client.hgetall(legacy_key)
             
             if not data:
+                logger.warning(f"Cell {cell_id} not found in session {session_hash}")
                 return None
             # Redis returns bytes, decode to string
-            return data.get(b'data', b'').decode('utf-8')
+            cell_data = data.get(b'data', b'').decode('utf-8')
+            logger.debug(f"Successfully retrieved cell {cell_id} from session {session_hash}")
+            return cell_data
+        except async_redis.RedisError as e:
+            logger.error(f"Redis error retrieving cell {cell_id}: {e}")
+            return None
         except Exception as e:
-            print(f"Error retrieving cell: {e}")
+            logger.error(f"Unexpected error retrieving cell {cell_id}: {e}")
             return None
         
     async def delete_cell(self, session_hash: str, cell_id: str, cell_timestamp: str) -> bool:
+        """
+        Delete cell from Redis.
+        
+        Args:
+            session_hash: Session identifier
+            cell_id: Cell identifier
+            cell_timestamp: Cell timestamp
+            
+        Returns:
+            True if cell was deleted, False otherwise
+        """
         try:
             # Try new key format first
             key = self.create_key(session_hash, cell_id, cell_timestamp)
@@ -70,12 +161,31 @@ class RedisClient:
                 legacy_key = self.create_legacy_key(session_hash, cell_id, cell_timestamp)
                 result = await self.client.delete(legacy_key)
             
+            if result >= 1:
+                logger.info(f"Successfully deleted cell {cell_id} from session {session_hash}")
+            else:
+                logger.warning(f"Cell {cell_id} not found for deletion in session {session_hash}")
             return result >= 1
+        except async_redis.RedisError as e:
+            logger.error(f"Redis error deleting cell {cell_id}: {e}")
+            return False
         except Exception as e:
-            print(f"Error deleting cell: {e}")
+            logger.error(f"Unexpected error deleting cell {cell_id}: {e}")
             return False
     
     async def update_cell(self, session_hash: str, cell_id: str, cell_data: str, timestamp: str) -> bool:
+        """
+        Update existing cell or create if it doesn't exist.
+        
+        Args:
+            session_hash: Session identifier
+            cell_id: Cell identifier
+            cell_data: Updated cell content
+            timestamp: Cell timestamp
+            
+        Returns:
+            True if successful, False otherwise
+        """
         try:
             key = self.create_key(session_hash, cell_id, timestamp)
             exists = await self.client.exists(key)
@@ -93,9 +203,13 @@ class RedisClient:
                 return result
             
             await self.client.hset(key, mapping={"data": cell_data, "timestamp": timestamp})
+            logger.info(f"Successfully updated cell {cell_id} in session {session_hash}")
             return True
+        except async_redis.RedisError as e:
+            logger.error(f"Redis error updating cell {cell_id}: {e}")
+            return False
         except Exception as e:
-            print(f"Error updating cell: {e}")
+            logger.error(f"Unexpected error updating cell {cell_id}: {e}")
             return False
     
     async def get_all_cell_ids(self, session_hash: Optional[str] = None) -> List[str]:
@@ -116,70 +230,53 @@ class RedisClient:
             else:
                 # Global query for backward compatibility
                 pattern = '*'
-
-            keys = await self.client.keys(pattern)
+            
             cell_ids = set()
-
-            for key in keys:
-                data = await self.client.hgetall(key)
-                cell_id = data.get(b'cell_id', b'').decode('utf-8')
-                if cell_id:
-                    cell_ids.add(cell_id)
-
-            return list(cell_ids)
+            
+            # Use SCAN instead of KEYS for production-safe iteration
+            # SCAN doesn't block Redis and is much more efficient
+            cursor = 0
+            while True:
+                cursor, keys = await self.client.scan(cursor=cursor, match=pattern, count=100)
+                
+                # Process keys in batch
+                for key in keys:
+                    try:
+                        data = await self.client.hgetall(key)
+                        cell_id = data.get(b'cell_id', b'').decode('utf-8')
+                        if cell_id:
+                            cell_ids.add(cell_id)
+                    except Exception as e:
+                        logger.warning(f"Error processing key {key}: {e}")
+                        continue
+                
+                # SCAN returns 0 when iteration is complete
+                if cursor == 0:
+                    break
+            
+            result = list(cell_ids)
+            logger.debug(f"Retrieved {len(result)} cell IDs for session={session_hash}")
+            return result
+            
+        except async_redis.RedisError as e:
+            logger.error(f"Redis error retrieving cell IDs: {e}")
+            return []
         except Exception as e:
-            print(f"Error retrieving all cell IDs: {e}")
+            logger.error(f"Unexpected error retrieving cell IDs: {e}")
             return []
 
-    async def clear_all_data(self) -> int:
+    async def close(self) -> None:
         """
-        Clear all data from Redis database.
-        Used when creating a new session or refreshing session code.
-
-        Returns:
-            Number of keys deleted (or 1 for success)
+        Close Redis connection pool.
+        
+        Should be called when shutting down the application.
         """
         try:
-            # Get count of keys before clearing (for reporting)
-            keys_count = await self.client.dbsize()
-            # Clear entire database
-            await self.client.flushdb()
-            return keys_count
+            await self.client.close()
+            await self.pool.disconnect()
+            logger.info("Redis connection pool closed successfully")
         except Exception as e:
-            print(f"Error clearing Redis data: {e}")
-            return 0
-
-    async def cleanup_orphan_cells(self, session_hash: str, valid_cell_ids: List[str]) -> int:
-        """
-        Delete cells from Redis that are not in the provided list of valid cell IDs.
-        This removes orphan cells that were deleted from the notebook but still exist in Redis.
-
-        Args:
-            session_hash: The session hash to clean up
-            valid_cell_ids: List of cell IDs that currently exist in the notebook
-
-        Returns:
-            Number of orphan cells deleted
-        """
-        try:
-            pattern = f"cs:{session_hash}:*"
-            keys = await self.client.keys(pattern)
-            deleted_count = 0
-
-            for key in keys:
-                data = await self.client.hgetall(key)
-                cell_id = data.get(b'cell_id', b'').decode('utf-8')
-
-                # If cell_id is not in the valid list, delete it
-                if cell_id and cell_id not in valid_cell_ids:
-                    result = await self.client.delete(key)
-                    if result >= 1:
-                        deleted_count += 1
-
-            return deleted_count
-        except Exception as e:
-            print(f"Error cleaning up orphan cells: {e}")
-            return 0
+            logger.error(f"Error closing Redis connection pool: {e}")
 
 
 redis_client = RedisClient()

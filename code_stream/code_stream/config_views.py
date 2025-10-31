@@ -4,7 +4,9 @@ Handles teacher server configuration (URL and token) for students.
 """
 
 import json
+import logging
 import time
+from typing import Optional
 from urllib.parse import urlparse
 from jupyter_server.base.handlers import APIHandler
 import tornado
@@ -12,6 +14,8 @@ from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPError
 
 from .config_store import config_store
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
 
 class ConfigHandler(APIHandler):
     """Handler for getting and setting teacher server configuration."""
@@ -35,6 +39,7 @@ class ConfigHandler(APIHandler):
         config = config_store.get_config(user_id)
 
         if not config:
+            logger.debug(f"No configuration found for user {user_id}")
             self.finish({
                 "status": "success",
                 "data": {
@@ -45,6 +50,7 @@ class ConfigHandler(APIHandler):
             return
 
         # Return masked config (never expose token)
+        logger.debug(f"Retrieved configuration for user {user_id}")
         self.finish({
             "status": "success",
             "data": {
@@ -71,7 +77,8 @@ class ConfigHandler(APIHandler):
 
         try:
             data = self.get_json_body()
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Invalid JSON in config POST request: {e}")
             self.set_status(400)
             self.finish({
                 "status": "error",
@@ -80,6 +87,7 @@ class ConfigHandler(APIHandler):
             return
 
         if data is None:
+            logger.warning("Empty request body in config POST")
             self.set_status(400)
             self.finish({
                 "status": "error",
@@ -92,6 +100,7 @@ class ConfigHandler(APIHandler):
 
         # Validate teacher_base_url
         if not teacher_base_url:
+            logger.warning("Missing teacher_base_url in config POST")
             self.set_status(400)
             self.finish({
                 "status": "error",
@@ -102,6 +111,7 @@ class ConfigHandler(APIHandler):
         # Validate URL format
         validation_error = self._validate_url(teacher_base_url)
         if validation_error:
+            logger.warning(f"Invalid URL in config POST: {validation_error}")
             self.set_status(400)
             self.finish({
                 "status": "error",
@@ -122,11 +132,13 @@ class ConfigHandler(APIHandler):
         success = config_store.set_config(user_id, config)
 
         if success:
+            logger.info(f"Configuration saved successfully for user {user_id}")
             self.finish({
                 "status": "success",
                 "message": "Configuration saved successfully"
             })
         else:
+            logger.error(f"Failed to save configuration for user {user_id}")
             self.set_status(500)
             self.finish({
                 "status": "error",
@@ -146,18 +158,20 @@ class ConfigHandler(APIHandler):
         success = config_store.delete_config(user_id)
 
         if success:
+            logger.info(f"Configuration deleted successfully for user {user_id}")
             self.finish({
                 "status": "success",
                 "message": "Configuration deleted successfully"
             })
         else:
+            logger.error(f"Failed to delete configuration for user {user_id}")
             self.set_status(500)
             self.finish({
                 "status": "error",
                 "message": "Failed to delete configuration"
             })
 
-    def _validate_url(self, url: str) -> str | None:
+    def _validate_url(self, url: str) -> Optional[str]:
         """
         Validate teacher server URL.
 
@@ -205,6 +219,7 @@ class TestConnectionHandler(APIHandler):
         config = config_store.get_config(user_id)
 
         if not config:
+            logger.warning(f"Test connection attempted without configuration for user {user_id}")
             self.set_status(428)  # Precondition Required
             self.finish({
                 "status": "error",
@@ -216,6 +231,7 @@ class TestConnectionHandler(APIHandler):
         teacher_token = config.get("teacher_token")
 
         if not teacher_base_url:
+            logger.warning(f"Test connection attempted with missing URL for user {user_id}")
             self.set_status(428)
             self.finish({
                 "status": "error",
@@ -245,17 +261,20 @@ class TestConnectionHandler(APIHandler):
 
             # Check if response is valid
             if response.code == 200:
+                logger.info(f"Connection test successful for user {user_id} to {teacher_base_url}")
                 self.finish({
                     "status": "success",
                     "message": "Connection to teacher server successful"
                 })
             else:
+                logger.warning(f"Connection test returned status {response.code} for user {user_id}")
                 self.finish({
                     "status": "error",
                     "message": f"Teacher server returned status code {response.code}"
                 })
 
         except HTTPError as e:
+            logger.warning(f"HTTP error during connection test for user {user_id}: {e.code}")
             if e.code == 401:
                 self.finish({
                     "status": "error",
@@ -279,6 +298,7 @@ class TestConnectionHandler(APIHandler):
 
         except Exception as e:
             error_message = str(e)
+            logger.error(f"Connection test failed for user {user_id}: {error_message}")
 
             if "Timeout" in error_message or "timed out" in error_message:
                 self.finish({

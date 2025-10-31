@@ -6,6 +6,8 @@ Auto-detects teacher/student mode and routes requests appropriately.
 """
 
 import json
+import logging
+from typing import Optional
 from urllib.parse import urlencode
 from jupyter_server.base.handlers import APIHandler
 import tornado
@@ -13,6 +15,9 @@ from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPError
 
 from .config_store import config_store
 from .redis_client import redis_client
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
 
 
 class UnifiedGetAllCellIDsHandler(APIHandler):
@@ -49,21 +54,21 @@ class UnifiedGetAllCellIDsHandler(APIHandler):
             # Teacher mode: Direct Redis access
             await self._handle_teacher_mode(session_hash_param)
 
-    async def _handle_teacher_mode(self, session_hash: str | None = None):
+    async def _handle_teacher_mode(self, session_hash: Optional[str] = None) -> None:
         """Teacher mode: Query Redis directly."""
         try:
             cell_ids = await redis_client.get_all_cell_ids(session_hash)
-            print(f"Code Stream (Teacher): Get all cell IDs success (session={session_hash}):", cell_ids)
+            logger.info(f"Code Stream (Teacher): Retrieved {len(cell_ids)} cell IDs (session={session_hash})")
             self.finish({"status": "success", "data": cell_ids})
         except Exception as e:
-            print(f"Code Stream (Teacher): Error getting cell IDs from Redis: {e}")
+            logger.error(f"Code Stream (Teacher): Error getting cell IDs from Redis: {e}", exc_info=True)
             self.set_status(500)
             self.finish({
                 "status": "error",
                 "message": "Failed to retrieve cell IDs from Redis"
             })
 
-    async def _handle_student_mode(self, config: dict, session_hash: str | None = None):
+    async def _handle_student_mode(self, config: dict, session_hash: Optional[str] = None) -> None:
         """Student mode: Proxy request to teacher server."""
         teacher_base_url = config.get("teacher_base_url")
         teacher_token = config.get("teacher_token")
@@ -94,8 +99,10 @@ class UnifiedGetAllCellIDsHandler(APIHandler):
             # Parse and return response
             try:
                 data = json.loads(response.body)
+                logger.info(f"Code Stream (Student): Successfully proxied get-all-cell-ids to teacher server")
                 self.finish(data)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                logger.error(f"Code Stream (Student): Invalid JSON response from teacher server: {e}")
                 self.set_status(502)
                 self.finish({
                     "status": "error",
@@ -103,12 +110,14 @@ class UnifiedGetAllCellIDsHandler(APIHandler):
                 })
 
         except HTTPError as e:
+            logger.warning(f"Code Stream (Student): HTTP error from teacher server: {e.code}")
             self._handle_http_error(e)
 
         except Exception as e:
+            logger.error(f"Code Stream (Student): Network error connecting to teacher server: {e}")
             self._handle_network_error(e)
 
-    def _handle_http_error(self, error: HTTPError):
+    def _handle_http_error(self, error: HTTPError) -> None:
         """Handle HTTP errors from teacher server."""
         if error.code == 401:
             self.set_status(401)
@@ -135,7 +144,7 @@ class UnifiedGetAllCellIDsHandler(APIHandler):
                 "message": f"Teacher server error (HTTP {error.code})"
             })
 
-    def _handle_network_error(self, error: Exception):
+    def _handle_network_error(self, error: Exception) -> None:
         """Handle network errors."""
         error_message = str(error)
 
@@ -206,7 +215,7 @@ class UnifiedGetCellHandler(APIHandler):
             # Teacher mode: Direct Redis access
             await self._handle_teacher_mode(session_hash, cell_id, cell_timestamp)
 
-    async def _handle_teacher_mode(self, session_hash: str, cell_id: str, cell_timestamp: str):
+    async def _handle_teacher_mode(self, session_hash: str, cell_id: str, cell_timestamp: str) -> None:
         """Teacher mode: Query Redis directly."""
         try:
             cell_data = await redis_client.get_cell(
@@ -220,18 +229,18 @@ class UnifiedGetCellHandler(APIHandler):
                 self.finish({"status": "error", "message": "Cell not found."})
                 return
 
-            print("Code Stream (Teacher): Cell get success:", cell_data)
+            logger.info(f"Code Stream (Teacher): Retrieved cell {cell_id} from session {session_hash}")
             self.finish({"status": "success", "data": cell_data})
 
         except Exception as e:
-            print(f"Code Stream (Teacher): Error getting cell from Redis: {e}")
+            logger.error(f"Code Stream (Teacher): Error getting cell from Redis: {e}", exc_info=True)
             self.set_status(500)
             self.finish({
                 "status": "error",
                 "message": "Failed to retrieve cell from Redis"
             })
 
-    async def _handle_student_mode(self, session_hash: str, cell_id: str, cell_timestamp: str, config: dict):
+    async def _handle_student_mode(self, session_hash: str, cell_id: str, cell_timestamp: str, config: dict) -> None:
         """Student mode: Proxy request to teacher server."""
         teacher_base_url = config.get("teacher_base_url")
         teacher_token = config.get("teacher_token")
@@ -263,8 +272,10 @@ class UnifiedGetCellHandler(APIHandler):
             # Parse and return response
             try:
                 data = json.loads(response.body)
+                logger.info(f"Code Stream (Student): Successfully proxied get-cell to teacher server")
                 self.finish(data)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                logger.error(f"Code Stream (Student): Invalid JSON response from teacher server: {e}")
                 self.set_status(502)
                 self.finish({
                     "status": "error",
@@ -272,12 +283,14 @@ class UnifiedGetCellHandler(APIHandler):
                 })
 
         except HTTPError as e:
+            logger.warning(f"Code Stream (Student): HTTP error from teacher server: {e.code}")
             self._handle_http_error(e)
 
         except Exception as e:
+            logger.error(f"Code Stream (Student): Network error connecting to teacher server: {e}")
             self._handle_network_error(e)
 
-    def _handle_http_error(self, error: HTTPError):
+    def _handle_http_error(self, error: HTTPError) -> None:
         """Handle HTTP errors from teacher server."""
         if error.code == 401:
             self.set_status(401)
@@ -304,7 +317,7 @@ class UnifiedGetCellHandler(APIHandler):
                 "message": f"Teacher server error (HTTP {error.code})"
             })
 
-    def _handle_network_error(self, error: Exception):
+    def _handle_network_error(self, error: Exception) -> None:
         """Handle network errors."""
         error_message = str(error)
 

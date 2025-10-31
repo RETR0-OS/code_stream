@@ -25,6 +25,9 @@ import { SessionPanel } from './components/SessionPanel';
 import { UpdateIcon } from './components/UpdateIcon';
 import { SyncToggle } from './components/SyncToggle';
 
+// Utilities
+import { logger } from './utils/logger';
+
 /**
  * Tracker for active notebook controls
  */
@@ -49,7 +52,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
     palette: ICommandPalette | null,
     toolbarRegistry: IToolbarWidgetRegistry | null
   ) => {
-    console.log('Code Stream: Extension activated');
+    logger.info('Extension activated');
 
     // Initialize services
     const roleManager = new RoleManager();
@@ -77,7 +80,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
           return hiddenWidget;
         }
       );
-      console.log('Code Stream: Cell toolbar factory registered');
+      logger.info('Cell toolbar factory registered');
     }
 
     // Track active notebook controls
@@ -110,10 +113,10 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
       if (roleManager.isTeacher()) {
         controls = new TeacherControls(panel, sessionManager, cellTracker);
-        console.log('Code Stream: Teacher controls initialized');
+        logger.info('Teacher controls initialized');
       } else {
         controls = new StudentControls(panel, cellTracker);
-        console.log('Code Stream: Student controls initialized');
+        logger.info('Student controls initialized');
       }
 
       // Store controls
@@ -160,7 +163,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
     // Listen for role changes and recreate controls
     roleManager.roleChanged.connect(() => {
-      console.log('Code Stream: Role changed, recreating controls');
+      logger.info('Role changed, recreating controls');
       recreateAllControls();
 
       // Force cell toolbar refresh by triggering widget updates
@@ -182,7 +185,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
       label: 'Code Stream: Switch to Teacher Mode',
       execute: () => {
         roleManager.setRole('teacher');
-        console.log('Code Stream: Switched to teacher mode');
+        logger.info('Switched to teacher mode');
       }
     });
 
@@ -190,7 +193,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
       label: 'Code Stream: Switch to Student Mode',
       execute: () => {
         roleManager.setRole('student');
-        console.log('Code Stream: Switched to student mode');
+        logger.info('Switched to student mode');
       }
     });
 
@@ -213,16 +216,16 @@ const plugin: JupyterFrontEndPlugin<void> = {
       settingRegistry
         .load(plugin.id)
         .then(settings => {
-          console.log('Code Stream: Settings loaded:', settings.composite);
+          logger.debug('Settings loaded:', settings.composite);
         })
         .catch(reason => {
-          console.error('Code Stream: Failed to load settings:', reason);
+          logger.error('Failed to load settings:', reason);
         });
     }
 
     // Log current role
-    console.log(`Code Stream: Current role is ${roleManager.getRole()}`);
-    console.log('Code Stream: To switch roles, use localStorage.setItem("code_stream_role", "teacher" or "student") and reload');
+    logger.info(`Current role is ${roleManager.getRole()}`);
+    logger.info('To switch roles, use localStorage.setItem("code_stream_role", "teacher" or "student") and reload');
   }
 };
 
