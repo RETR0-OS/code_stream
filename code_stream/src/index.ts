@@ -87,7 +87,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
     const notebookControls = new Map<string, INotebookControls>();
 
     // Create and add session panel to sidebar
-    const sessionPanel = new SessionPanel(sessionManager, roleManager);
+    const sessionPanel = new SessionPanel(sessionManager, roleManager, cellTracker);
     sessionPanel.id = 'code-stream-session-panel';
     app.shell.add(sessionPanel, 'left', { rank: 1000 });
 
