@@ -7,7 +7,7 @@ import redis.asyncio as async_redis
 
 # Configure logger
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.ERROR)
 
 class RedisClient:
     """

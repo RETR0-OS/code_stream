@@ -17,6 +17,7 @@ from .config_store import config_store
 from .redis_client import redis_client
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
 
 
 class UnifiedGetAllCellIDsHandler(APIHandler):

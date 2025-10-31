@@ -5,6 +5,7 @@ import tornado
 from .redis_client import redis_client
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
 
 '''
 CRUD API Handlers for managing code cells in Redis.

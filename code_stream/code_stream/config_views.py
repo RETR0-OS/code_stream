@@ -15,7 +15,7 @@ from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPError
 from .config_store import config_store
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.ERROR)
 
 class ConfigHandler(APIHandler):
     """Handler for getting and setting teacher server configuration."""

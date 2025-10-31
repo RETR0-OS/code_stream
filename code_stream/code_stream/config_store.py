@@ -11,6 +11,7 @@ from typing import Optional, Dict, Any, Union
 from jupyter_core.paths import jupyter_data_dir
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
 
 
 class ConfigStore:
