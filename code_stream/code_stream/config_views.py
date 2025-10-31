@@ -6,6 +6,7 @@ Handles teacher server configuration (URL and token) for students.
 import json
 import logging
 import time
+from typing import Optional
 from urllib.parse import urlparse
 from jupyter_server.base.handlers import APIHandler
 import tornado
@@ -170,7 +171,7 @@ class ConfigHandler(APIHandler):
                 "message": "Failed to delete configuration"
             })
 
-    def _validate_url(self, url: str) -> str | None:
+    def _validate_url(self, url: str) -> Optional[str]:
         """
         Validate teacher server URL.
 
