@@ -38,10 +38,8 @@ export class SessionManager {
     this._roleManager = roleManager;
     this._syncService = syncService;
 
-    // Load session hash from localStorage
-    this._loadSessionHash();
-
-    // Load teacher base URL from localStorage (for students)
+    // NOTE: Session hash is NOT loaded from localStorage - it must be created fresh each time
+    // Only load teacher base URL for students (display/connection purposes)
     this._loadTeacherBaseUrl();
   }
 
@@ -51,31 +49,34 @@ export class SessionManager {
    */
   public initialize(notebook: INotebookModel): void {
     this._notebookModel = notebook;
-    this._loadNotebookMetadata();
-
-    // If teacher and no session hash exists, create one
-    if (this._roleManager.isTeacher() && !this._sessionHash) {
-      this.createSession();
-    }
+    // NOTE: We load notebook metadata for reference only, but do NOT auto-load session hash
+    // Teachers must explicitly create a new session each time
   }
 
   /**
    * Create a new session (Teacher only)
+   * Clears all Redis data before creating the new session
    * @returns Session hash
    */
-  public createSession(): string {
+  public async createSession(): Promise<string> {
     if (!this._roleManager.isTeacher()) {
       console.warn('Code Stream: Only teachers can create sessions');
       return '';
     }
 
+    // Clear all Redis data before creating new session
+    try {
+      const result = await this._syncService.clearAllRedisData();
+      console.log(`Code Stream: Cleared ${result.deleted_count} Redis keys before creating new session`);
+    } catch (error) {
+      console.error('Code Stream: Failed to clear Redis data:', error);
+      // Continue anyway - this is not fatal
+    }
+
     const hash = generateHash();
     this._sessionHash = hash;
 
-    // Persist to localStorage
-    localStorage.setItem(STORAGE_KEYS.SESSION_HASH, hash);
-
-    // Persist to notebook metadata
+    // Persist to notebook metadata only (NOT localStorage)
     this._saveNotebookMetadata();
 
     this._sessionChanged.emit(hash);
@@ -102,10 +103,7 @@ export class SessionManager {
 
     this._sessionHash = hash;
 
-    // Persist to localStorage
-    localStorage.setItem(STORAGE_KEYS.SESSION_HASH, hash);
-
-    // Persist to notebook metadata
+    // Persist to notebook metadata only (NOT localStorage)
     this._saveNotebookMetadata();
 
     this._sessionChanged.emit(hash);
@@ -192,10 +190,73 @@ export class SessionManager {
   public clearSession(): void {
     this._sessionHash = null;
     this._cellStates.clear();
-    localStorage.removeItem(STORAGE_KEYS.SESSION_HASH);
     this._sessionChanged.emit(null);
 
     console.log('Code Stream: Session cleared');
+  }
+
+  /**
+   * Refresh session code (Teacher only)
+   * Generates a new session code, clears Redis, and updates metadata
+   * Note: Caller is responsible for re-syncing cells via CellTracker.resyncAllCells()
+   * @returns New session hash
+   */
+  public async refreshSessionCode(): Promise<string> {
+    if (!this._roleManager.isTeacher()) {
+      console.warn('Code Stream: Only teachers can refresh session code');
+      return '';
+    }
+
+    const oldHash = this._sessionHash;
+
+    // Clear all Redis data
+    try {
+      const result = await this._syncService.clearAllRedisData();
+      console.log(`Code Stream: Cleared ${result.deleted_count} Redis keys for session refresh`);
+    } catch (error) {
+      console.error('Code Stream: Failed to clear Redis data:', error);
+      throw error;
+    }
+
+    // Generate new session hash
+    const hash = generateHash();
+    this._sessionHash = hash;
+
+    // Update notebook metadata
+    this._saveNotebookMetadata();
+
+    this._sessionChanged.emit(hash);
+
+    console.log(`Code Stream: Refreshed session code from ${oldHash} to ${hash}`);
+    return hash;
+  }
+
+  /**
+   * Clean up orphan cells from Redis (Teacher only)
+   * Removes cells that exist in Redis but not in the provided list of valid cell IDs
+   * @param validCellIds - Array of cell IDs currently in the notebook
+   * @returns Number of orphan cells deleted
+   */
+  public async cleanupOrphanCells(validCellIds: string[]): Promise<number> {
+    if (!this._roleManager.isTeacher()) {
+      console.warn('Code Stream: Only teachers can cleanup orphan cells');
+      return 0;
+    }
+
+    const sessionHash = this._sessionHash;
+    if (!sessionHash) {
+      console.warn('Code Stream: No active session for orphan cleanup');
+      return 0;
+    }
+
+    try {
+      const result = await this._syncService.cleanupOrphanCells(sessionHash, validCellIds);
+      console.log(`Code Stream: Cleaned up ${result.deleted_count} orphan cells`);
+      return result.deleted_count;
+    } catch (error) {
+      console.error('Code Stream: Failed to cleanup orphan cells:', error);
+      throw error;
+    }
   }
 
   /**
@@ -269,18 +330,6 @@ export class SessionManager {
   }
 
   /**
-   * Load session hash from localStorage
-   * @private
-   */
-  private _loadSessionHash(): void {
-    const hash = localStorage.getItem(STORAGE_KEYS.SESSION_HASH);
-    if (hash && validateHash(hash)) {
-      this._sessionHash = hash;
-      console.log(`Code Stream: Loaded session hash from localStorage: ${hash}`);
-    }
-  }
-
-  /**
    * Load teacher base URL from localStorage
    * @private
    */
@@ -294,6 +343,8 @@ export class SessionManager {
 
   /**
    * Load notebook metadata
+   * NOTE: This method is kept for reference but does NOT load session hash
+   * Session hash must be created/joined explicitly
    * @private
    */
   private _loadNotebookMetadata(): void {
@@ -311,10 +362,8 @@ export class SessionManager {
     }
     const metadata = metadataValue as INotebookMetadata['code_stream'] | undefined;
 
-    if (metadata && metadata.session_hash) {
-      this._sessionHash = metadata.session_hash;
-      console.log(`Code Stream: Loaded session from notebook metadata: ${metadata.session_hash}`);
-    }
+    // NOTE: We do NOT load session_hash from metadata anymore
+    // Teachers must create a new session, students must join explicitly
 
     // Load teacher base URL from notebook metadata (students only, for display)
     if (metadata && metadata.teacher_base_url && this._roleManager.isStudent()) {

@@ -7,6 +7,7 @@ import { Widget } from '@lumino/widgets';
 import { LabIcon } from '@jupyterlab/ui-components';
 import { SessionManager } from '../services/SessionManager';
 import { RoleManager } from '../services/RoleManager';
+import { CellTracker } from '../services/CellTracker';
 
 /**
  * Session panel widget
@@ -14,18 +15,21 @@ import { RoleManager } from '../services/RoleManager';
 export class SessionPanel extends Widget {
   private _sessionManager: SessionManager;
   private _roleManager: RoleManager;
+  private _cellTracker: CellTracker;
   private _joinInputElement: HTMLInputElement | null = null;
 
   /**
    * Constructor
    * @param sessionManager - Session manager instance
    * @param roleManager - Role manager instance
+   * @param cellTracker - Cell tracker instance
    */
-  constructor(sessionManager: SessionManager, roleManager: RoleManager) {
+  constructor(sessionManager: SessionManager, roleManager: RoleManager, cellTracker: CellTracker) {
     super();
 
     this._sessionManager = sessionManager;
     this._roleManager = roleManager;
+    this._cellTracker = cellTracker;
 
     this.addClass('cs-session-panel');
     this.title.label = 'Code Stream';
@@ -78,6 +82,7 @@ export class SessionPanel extends Widget {
           <div class="cs-session-code-display">
             <code class="cs-session-code">${sessionHash ? sessionHash : 'Loading...'}</code>
             <button class="cs-copy-button" title="Copy session code">Copy</button>
+            <button class="cs-refresh-button" title="Refresh session code">Refresh</button>
           </div>
           <p class="cs-session-hint">Share this code with students</p>
         </div>
@@ -92,6 +97,12 @@ export class SessionPanel extends Widget {
     const copyButton = this.node.querySelector('.cs-copy-button') as HTMLButtonElement;
     if (copyButton) {
       copyButton.addEventListener('click', () => this._copySessionCode());
+    }
+
+    // Setup refresh button
+    const refreshButton = this.node.querySelector('.cs-refresh-button') as HTMLButtonElement;
+    if (refreshButton) {
+      refreshButton.addEventListener('click', () => this._refreshSessionCode());
     }
   }
 
@@ -252,6 +263,75 @@ export class SessionPanel extends Widget {
         console.error('Code Stream: Failed to copy session code:', err);
       }
     );
+  }
+
+  /**
+   * Refresh session code
+   * @private
+   */
+  private async _refreshSessionCode(): Promise<void> {
+    // Show confirmation dialog
+    const confirmed = window.confirm(
+      'Generate new session code? This will clear all shared cells and students must rejoin with the new code.'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const refreshButton = this.node.querySelector('.cs-refresh-button') as HTMLButtonElement;
+    const originalText = refreshButton ? refreshButton.textContent : '';
+
+    try {
+      // Show loading state
+      if (refreshButton) {
+        refreshButton.textContent = 'Refreshing...';
+        refreshButton.disabled = true;
+      }
+
+      // Refresh session code (clears Redis)
+      const newHash = await this._sessionManager.refreshSessionCode();
+      console.log(`Code Stream: Session code refreshed to ${newHash}`);
+
+      // Re-sync all cells with sync enabled
+      const syncedCount = await this._cellTracker.resyncAllCells();
+      console.log(`Code Stream: Re-synced ${syncedCount} cells`);
+
+      // Cleanup orphan cells
+      const validCellIds = this._cellTracker.getAllActiveCellIds();
+      const deletedCount = await this._sessionManager.cleanupOrphanCells(validCellIds);
+      console.log(`Code Stream: Cleaned up ${deletedCount} orphan cells`);
+
+      // Show success feedback
+      if (refreshButton) {
+        refreshButton.textContent = 'Refreshed!';
+        refreshButton.classList.add('cs-refresh-button-success');
+
+        setTimeout(() => {
+          refreshButton.textContent = originalText;
+          refreshButton.classList.remove('cs-refresh-button-success');
+          refreshButton.disabled = false;
+        }, 2000);
+      }
+
+      console.log('Code Stream: Session code refresh complete');
+    } catch (error) {
+      console.error('Code Stream: Failed to refresh session code:', error);
+
+      // Show error feedback
+      if (refreshButton) {
+        refreshButton.textContent = 'Failed!';
+        refreshButton.classList.add('cs-refresh-button-error');
+
+        setTimeout(() => {
+          refreshButton.textContent = originalText;
+          refreshButton.classList.remove('cs-refresh-button-error');
+          refreshButton.disabled = false;
+        }, 2000);
+      }
+
+      alert('Failed to refresh session code. Please try again.');
+    }
   }
 
   /**
