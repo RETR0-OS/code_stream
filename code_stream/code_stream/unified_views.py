@@ -6,6 +6,7 @@ Auto-detects teacher/student mode and routes requests appropriately.
 """
 
 import json
+import logging
 from urllib.parse import urlencode
 from jupyter_server.base.handlers import APIHandler
 import tornado
@@ -13,6 +14,8 @@ from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPError
 
 from .config_store import config_store
 from .redis_client import redis_client
+
+logger = logging.getLogger(__name__)
 
 
 class UnifiedGetAllCellIDsHandler(APIHandler):
@@ -53,10 +56,10 @@ class UnifiedGetAllCellIDsHandler(APIHandler):
         """Teacher mode: Query Redis directly."""
         try:
             cell_ids = await redis_client.get_all_cell_ids(session_hash)
-            print(f"Code Stream (Teacher): Get all cell IDs success (session={session_hash}):", cell_ids)
+            logger.info(f"Code Stream (Teacher): Retrieved {len(cell_ids)} cell IDs (session={session_hash})")
             self.finish({"status": "success", "data": cell_ids})
         except Exception as e:
-            print(f"Code Stream (Teacher): Error getting cell IDs from Redis: {e}")
+            logger.error(f"Code Stream (Teacher): Error getting cell IDs from Redis: {e}", exc_info=True)
             self.set_status(500)
             self.finish({
                 "status": "error",
@@ -94,8 +97,10 @@ class UnifiedGetAllCellIDsHandler(APIHandler):
             # Parse and return response
             try:
                 data = json.loads(response.body)
+                logger.info(f"Code Stream (Student): Successfully proxied get-all-cell-ids to teacher server")
                 self.finish(data)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                logger.error(f"Code Stream (Student): Invalid JSON response from teacher server: {e}")
                 self.set_status(502)
                 self.finish({
                     "status": "error",
@@ -103,9 +108,11 @@ class UnifiedGetAllCellIDsHandler(APIHandler):
                 })
 
         except HTTPError as e:
+            logger.warning(f"Code Stream (Student): HTTP error from teacher server: {e.code}")
             self._handle_http_error(e)
 
         except Exception as e:
+            logger.error(f"Code Stream (Student): Network error connecting to teacher server: {e}")
             self._handle_network_error(e)
 
     def _handle_http_error(self, error: HTTPError):
@@ -220,11 +227,11 @@ class UnifiedGetCellHandler(APIHandler):
                 self.finish({"status": "error", "message": "Cell not found."})
                 return
 
-            print("Code Stream (Teacher): Cell get success:", cell_data)
+            logger.info(f"Code Stream (Teacher): Retrieved cell {cell_id} from session {session_hash}")
             self.finish({"status": "success", "data": cell_data})
 
         except Exception as e:
-            print(f"Code Stream (Teacher): Error getting cell from Redis: {e}")
+            logger.error(f"Code Stream (Teacher): Error getting cell from Redis: {e}", exc_info=True)
             self.set_status(500)
             self.finish({
                 "status": "error",
@@ -263,8 +270,10 @@ class UnifiedGetCellHandler(APIHandler):
             # Parse and return response
             try:
                 data = json.loads(response.body)
+                logger.info(f"Code Stream (Student): Successfully proxied get-cell to teacher server")
                 self.finish(data)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                logger.error(f"Code Stream (Student): Invalid JSON response from teacher server: {e}")
                 self.set_status(502)
                 self.finish({
                     "status": "error",
@@ -272,9 +281,11 @@ class UnifiedGetCellHandler(APIHandler):
                 })
 
         except HTTPError as e:
+            logger.warning(f"Code Stream (Student): HTTP error from teacher server: {e.code}")
             self._handle_http_error(e)
 
         except Exception as e:
+            logger.error(f"Code Stream (Student): Network error connecting to teacher server: {e}")
             self._handle_network_error(e)
 
     def _handle_http_error(self, error: HTTPError):
