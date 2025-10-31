@@ -147,7 +147,7 @@ const UseCases = () => {
               Trusted by Educational Communities Worldwide
             </h3>
             <p className="text-gray-600 text-lg">
-              Join thousands of educators who've transformed their teaching with CodeStream
+              Join thousands of educators who&apos;ve transformed their teaching with CodeStream
             </p>
           </div>
 

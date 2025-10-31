@@ -370,7 +370,7 @@ const MockupDemo = () => {
                     <FaChevronDown className="text-stream-500 mt-1 flex-shrink-0" />
                     <div>
                       <h4 className="font-semibold text-gray-900">Sync Dropdowns</h4>
-                      <p className="text-gray-600">Click "Sync" button to choose which teacher cell to connect to</p>
+                      <p className="text-gray-600">Click &quot;Sync&quot; button to choose which teacher cell to connect to</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">

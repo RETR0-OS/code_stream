@@ -177,7 +177,7 @@ const HowItWorks = () => {
                 </div>
                 <h4 className="font-bold text-gray-900 mb-2">Teacher</h4>
                 <p className="text-sm text-gray-600 mb-4">
-                  "Let me start a session for today's Python workshop"
+                  &quot;Let me start a session for today&apos;s Python workshop&quot;
                 </p>
                 <div className="bg-primary-50 rounded-lg p-3">
                   <div className="text-xs text-primary-600 font-mono">
@@ -198,7 +198,7 @@ const HowItWorks = () => {
                 </div>
                 <h4 className="font-bold text-gray-900 mb-2">Student</h4>
                 <p className="text-sm text-gray-600 mb-4">
-                  "I'll join with the code the professor shared"
+                  &quot;I&apos;ll join with the code the professor shared&quot;
                 </p>
                 <div className="bg-stream-50 rounded-lg p-3">
                   <div className="text-xs text-stream-600">
@@ -219,7 +219,7 @@ const HowItWorks = () => {
                 </div>
                 <h4 className="font-bold text-gray-900 mb-2">Magic!</h4>
                 <p className="text-sm text-gray-600 mb-4">
-                  "Everyone's notebooks are now perfectly synchronized"
+                  &quot;Everyone&apos;s notebooks are now perfectly synchronized&quot;
                 </p>
                 <div className="bg-accent-50 rounded-lg p-3">
                   <div className="text-xs text-accent-600">
