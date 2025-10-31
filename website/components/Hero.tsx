@@ -155,7 +155,7 @@ const Hero = () => {
                     transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
                     className="text-blue-400"
                   >
-                    In [2]: df = pd.read_csv('data.csv')
+                    In [2]: df = pd.read_csv(&apos;data.csv&apos;)
                   </motion.div>
                   <motion.div
                     animate={{ opacity: [0.3, 0.8, 0.3] }}
