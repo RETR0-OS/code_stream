@@ -101,11 +101,11 @@ class RedisClient:
     async def get_all_cell_ids(self, session_hash: Optional[str] = None) -> List[str]:
         """
         Get all cell IDs, optionally filtered by session.
-        
+
         Args:
             session_hash: If provided, return only cell IDs for this session.
                          If None, return all cell IDs (legacy behavior).
-        
+
         Returns:
             List of unique cell IDs
         """
@@ -116,20 +116,70 @@ class RedisClient:
             else:
                 # Global query for backward compatibility
                 pattern = '*'
-            
+
             keys = await self.client.keys(pattern)
             cell_ids = set()
-            
+
             for key in keys:
                 data = await self.client.hgetall(key)
                 cell_id = data.get(b'cell_id', b'').decode('utf-8')
                 if cell_id:
                     cell_ids.add(cell_id)
-            
+
             return list(cell_ids)
         except Exception as e:
             print(f"Error retrieving all cell IDs: {e}")
             return []
+
+    async def clear_all_data(self) -> int:
+        """
+        Clear all data from Redis database.
+        Used when creating a new session or refreshing session code.
+
+        Returns:
+            Number of keys deleted (or 1 for success)
+        """
+        try:
+            # Get count of keys before clearing (for reporting)
+            keys_count = await self.client.dbsize()
+            # Clear entire database
+            await self.client.flushdb()
+            return keys_count
+        except Exception as e:
+            print(f"Error clearing Redis data: {e}")
+            return 0
+
+    async def cleanup_orphan_cells(self, session_hash: str, valid_cell_ids: List[str]) -> int:
+        """
+        Delete cells from Redis that are not in the provided list of valid cell IDs.
+        This removes orphan cells that were deleted from the notebook but still exist in Redis.
+
+        Args:
+            session_hash: The session hash to clean up
+            valid_cell_ids: List of cell IDs that currently exist in the notebook
+
+        Returns:
+            Number of orphan cells deleted
+        """
+        try:
+            pattern = f"cs:{session_hash}:*"
+            keys = await self.client.keys(pattern)
+            deleted_count = 0
+
+            for key in keys:
+                data = await self.client.hgetall(key)
+                cell_id = data.get(b'cell_id', b'').decode('utf-8')
+
+                # If cell_id is not in the valid list, delete it
+                if cell_id and cell_id not in valid_cell_ids:
+                    result = await self.client.delete(key)
+                    if result >= 1:
+                        deleted_count += 1
+
+            return deleted_count
+        except Exception as e:
+            print(f"Error cleaning up orphan cells: {e}")
+            return 0
 
 
 redis_client = RedisClient()

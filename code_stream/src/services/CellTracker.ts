@@ -337,6 +337,89 @@ export class CellTracker {
   }
 
   /**
+   * Get all active cell IDs from current notebook
+   * @returns Array of cell IDs that exist in the notebook
+   */
+  public getAllActiveCellIds(): string[] {
+    if (!this._notebookModel) {
+      console.warn('Code Stream: Cannot get active cell IDs - no notebook model');
+      return [];
+    }
+
+    const cellIds: string[] = [];
+
+    for (let i = 0; i < this._notebookModel.cells.length; i++) {
+      const cellModel = this._notebookModel.cells.get(i);
+      if (cellModel && cellModel.sharedModel) {
+        const allMetadata = cellModel.sharedModel.getMetadata();
+        const metadataValue = allMetadata['code_stream'];
+        const metadata = metadataValue as ICellMetadata['code_stream'] | undefined;
+
+        if (metadata && metadata.cell_id) {
+          cellIds.push(metadata.cell_id);
+        }
+      }
+    }
+
+    console.log(`Code Stream: Found ${cellIds.length} active cell IDs in notebook`);
+    return cellIds;
+  }
+
+  /**
+   * Re-sync all cells with sync enabled to backend (Teacher)
+   * Used after refreshing session code to repopulate Redis
+   * @returns Number of cells synced
+   */
+  public async resyncAllCells(): Promise<number> {
+    if (!this._roleManager.isTeacher()) {
+      console.warn('Code Stream: Only teachers can resync cells');
+      return 0;
+    }
+
+    if (!this._notebookModel) {
+      console.warn('Code Stream: Cannot resync cells - no notebook model');
+      return 0;
+    }
+
+    const sessionHash = this._sessionManager.getSessionHash();
+    if (!sessionHash) {
+      console.warn('Code Stream: Cannot resync cells - no active session');
+      return 0;
+    }
+
+    console.log('Code Stream: Starting resync of all cells with sync enabled...');
+    let syncedCount = 0;
+
+    for (let i = 0; i < this._notebookModel.cells.length; i++) {
+      const cellModel = this._notebookModel.cells.get(i);
+      if (cellModel && cellModel.sharedModel) {
+        const allMetadata = cellModel.sharedModel.getMetadata();
+        const metadataValue = allMetadata['code_stream'];
+        const metadata = metadataValue as ICellMetadata['code_stream'] | undefined;
+
+        if (metadata && metadata.sync_enabled && metadata.cell_id) {
+          const cellData: ICellData = {
+            cell_id: metadata.cell_id,
+            cell_content: cellModel.sharedModel.getSource(),
+            cell_timestamp: generateTimestamp()
+          };
+
+          try {
+            await this._sessionManager.syncService.pushCell(sessionHash, cellData);
+            console.log(`Code Stream: Resynced cell ${metadata.cell_id}`);
+            syncedCount++;
+          } catch (error) {
+            console.error(`Code Stream: Failed to resync cell ${metadata.cell_id}:`, error);
+          }
+        }
+      }
+    }
+
+    console.log(`Code Stream: Resync complete - ${syncedCount} cell(s) synced`);
+    return syncedCount;
+  }
+
+  /**
    * Initialize metadata for existing cells
    * @private
    */

@@ -163,6 +163,54 @@ export class SyncService {
   }
 
   /**
+   * Clear all Redis data (Teacher)
+   * Used when creating a new session or refreshing session code
+   * @returns Promise with number of deleted keys
+   */
+  public async clearAllRedisData(): Promise<{ status: string; deleted_count: number }> {
+    try {
+      const endpoint = `clear-all-redis`;
+      const response = await requestAPI<{ status: string; deleted_count: number }>(endpoint, {
+        method: 'POST'
+      });
+
+      console.log(`Code Stream: Cleared all Redis data. Deleted ${response.deleted_count} keys`);
+      return response;
+    } catch (error) {
+      console.error('Code Stream: Error clearing Redis data:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Clean up orphan cells from Redis (Teacher)
+   * Removes cells that exist in Redis but not in the current notebook
+   * @param hash - Session hash (6-character code)
+   * @param validCellIds - Array of cell IDs currently in the notebook
+   * @returns Promise with number of deleted orphan cells
+   */
+  public async cleanupOrphanCells(
+    hash: string,
+    validCellIds: string[]
+  ): Promise<{ status: string; deleted_count: number }> {
+    try {
+      const endpoint = `${hash}/cleanup-orphan-cells`;
+      const response = await requestAPI<{ status: string; deleted_count: number }>(endpoint, {
+        method: 'POST',
+        body: JSON.stringify({
+          valid_cell_ids: validCellIds
+        })
+      });
+
+      console.log(`Code Stream: Cleaned up orphan cells for session ${hash}. Deleted ${response.deleted_count} orphan cells`);
+      return response;
+    } catch (error) {
+      console.error('Code Stream: Error cleaning up orphan cells:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get teacher server configuration (Student)
    * @returns Promise with config response
    */

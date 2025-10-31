@@ -7,6 +7,7 @@ import tornado
 from .redis_views import PushCellHandler, GetCellHandler, UpdateCellHandler, DeleteCellHandler, GetAllCellIDsHandler
 from .config_views import ConfigHandler, TestConnectionHandler
 from .unified_views import UnifiedGetAllCellIDsHandler, UnifiedGetCellHandler
+from .session_management_views import ClearAllRedisHandler, CleanupOrphanCellsHandler
 
 
 class RouteHandler(APIHandler):
@@ -35,6 +36,10 @@ def setup_handlers(web_app):
     config_endpoint = url_path_join(base_url, r"/code_stream/config")
     test_endpoint = url_path_join(base_url, r"/code_stream/test")
 
+    # Session management endpoints (clear Redis, cleanup orphan cells)
+    clear_redis = url_path_join(base_url, r"/code_stream/clear-all-redis")
+    cleanup_orphans = url_path_join(base_url, r"/code_stream/([a-zA-Z0-9]{6})/cleanup-orphan-cells")
+
     # Unified endpoints (auto-detect teacher/student mode for read operations)
     # Session-scoped get-all-cell-ids (primary)
     session_get_all_cell_ids = url_path_join(base_url, r"/code_stream/([a-zA-Z0-9]{6})/get-all-cell-ids/")
@@ -55,6 +60,9 @@ def setup_handlers(web_app):
         # Configuration endpoints
         (config_endpoint, ConfigHandler),
         (test_endpoint, TestConnectionHandler),
+        # Session management endpoints
+        (clear_redis, ClearAllRedisHandler),
+        (cleanup_orphans, CleanupOrphanCellsHandler),
         # Unified endpoints (auto-detect teacher/student mode for read operations)
         (session_get_all_cell_ids, UnifiedGetAllCellIDsHandler),
         (global_get_all_cell_ids, UnifiedGetAllCellIDsHandler),
