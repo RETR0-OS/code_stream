@@ -317,7 +317,8 @@
   color: var(--jp-brand-color1);
 }
 
-.cs-copy-button {
+.cs-copy-button,
+.cs-refresh-button {
   padding: 8px 12px;
   background-color: var(--jp-brand-color1);
   color: var(--jp-ui-inverse-font-color1);
@@ -329,12 +330,18 @@
   transition: background-color 0.2s ease;
 }
 
-.cs-copy-button:hover {
+.cs-copy-button:hover,
+.cs-refresh-button:hover {
   background-color: var(--jp-brand-color0);
 }
 
-.cs-copy-button-success {
+.cs-copy-button-success,
+.cs-refresh-button-success {
   background-color: var(--jp-success-color1);
+}
+
+.cs-refresh-button-error {
+  background-color: var(--jp-error-color1);
 }
 
 .cs-session-hint {
@@ -342,6 +349,115 @@
   color: var(--jp-ui-font-color3);
   margin: 0;
   font-style: italic;
+}
+
+/* Teacher Server Configuration (Student) */
+.cs-config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--jp-border-color2);
+}
+
+.cs-config-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--jp-ui-font-color1);
+}
+
+.cs-config-section label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--jp-ui-font-color2);
+  margin-bottom: 4px;
+}
+
+.cs-teacher-url-input,
+.cs-teacher-token-input {
+  padding: 8px 12px;
+  background-color: var(--jp-input-background);
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 4px;
+  font-family: var(--jp-ui-font-family);
+  font-size: 13px;
+  color: var(--jp-ui-font-color1);
+  text-transform: none;
+  margin-bottom: 8px;
+}
+
+.cs-teacher-url-input:focus,
+.cs-teacher-token-input:focus {
+  outline: none;
+  border-color: var(--jp-brand-color1);
+  box-shadow: 0 0 0 3px var(--jp-brand-color3);
+}
+
+.cs-config-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.cs-save-config-button,
+.cs-test-connection-button {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.cs-save-config-button {
+  background-color: var(--jp-brand-color1);
+  color: var(--jp-ui-inverse-font-color1);
+}
+
+.cs-save-config-button:hover {
+  background-color: var(--jp-brand-color0);
+}
+
+.cs-test-connection-button {
+  background-color: var(--jp-layout-color3);
+  color: var(--jp-ui-font-color1);
+}
+
+.cs-test-connection-button:hover {
+  background-color: var(--jp-layout-color4);
+}
+
+.cs-config-status {
+  min-height: 20px;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.cs-config-status .cs-success {
+  color: var(--jp-success-color1);
+}
+
+.cs-config-status .cs-error {
+  color: var(--jp-error-color1);
+}
+
+.cs-config-status .cs-info {
+  color: var(--jp-info-color1);
+}
+
+.cs-warning {
+  font-size: 11px;
+  color: var(--jp-warn-color1);
+  margin: 4px 0 0 0;
+  font-style: italic;
+}
+
+.cs-status-ready {
+  background-color: var(--jp-info-color1);
+  box-shadow: 0 0 4px var(--jp-info-color1);
 }
 
 /* Session Join Section (Student) */
@@ -363,12 +479,13 @@
   background-color: var(--jp-input-background);
   border: 1px solid var(--jp-border-color1);
   border-radius: 4px;
-  font-family: var(--jp-code-font-family);
+  font-family: var(--jp-code-font-family), 'Menlo', 'Monaco', 'Courier New', monospace;
   font-size: 16px;
   font-weight: bold;
   letter-spacing: 2px;
   text-align: center;
   color: var(--jp-ui-font-color1);
+  text-transform: none;
 }
 
 .cs-join-input:focus {
