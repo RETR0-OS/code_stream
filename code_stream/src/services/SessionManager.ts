@@ -51,6 +51,7 @@ export class SessionManager {
     this._notebookModel = notebook;
     // NOTE: We load notebook metadata for reference only, but do NOT auto-load session hash
     // Teachers must explicitly create a new session each time
+    this._loadNotebookMetadata();
   }
 
   /**
@@ -347,30 +348,30 @@ export class SessionManager {
    * Session hash must be created/joined explicitly
    * @private
    */
-  // private _loadNotebookMetadata(): void {
-  //   if (!this._notebookModel) {
-  //     return;
-  //   }
+  private _loadNotebookMetadata(): void {
+    if (!this._notebookModel) {
+      return;
+    }
 
-  //   let metadataValue: unknown = undefined;
-  //   if (
-  //     this._notebookModel &&
-  //     this._notebookModel.metadata &&
-  //     typeof (this._notebookModel.metadata as any).get === 'function'
-  //   ) {
-  //     metadataValue = (this._notebookModel.metadata as any).get('code_stream');
-  //   }
-  //   const metadata = metadataValue as INotebookMetadata['code_stream'] | undefined;
+    let metadataValue: unknown = undefined;
+    if (
+      this._notebookModel &&
+      this._notebookModel.metadata &&
+      typeof (this._notebookModel.metadata as any).get === 'function'
+    ) {
+      metadataValue = (this._notebookModel.metadata as any).get('code_stream');
+    }
+    const metadata = metadataValue as INotebookMetadata['code_stream'] | undefined;
 
-  //   // NOTE: We do NOT load session_hash from metadata anymore
-  //   // Teachers must create a new session, students must join explicitly
+    // NOTE: We do NOT load session_hash from metadata anymore
+    // Teachers must create a new session, students must join explicitly
 
-  //   // Load teacher base URL from notebook metadata (students only, for display)
-  //   if (metadata && metadata.teacher_base_url && this._roleManager.isStudent()) {
-  //     this._teacherBaseUrl = metadata.teacher_base_url;
-  //     console.log(`Code Stream: Loaded teacher base URL from notebook metadata: ${metadata.teacher_base_url}`);
-  //   }
-  // }
+    // Load teacher base URL from notebook metadata (students only, for display)
+    if (metadata && metadata.teacher_base_url && this._roleManager.isStudent()) {
+      this._teacherBaseUrl = metadata.teacher_base_url;
+      console.log(`Code Stream: Loaded teacher base URL from notebook metadata: ${metadata.teacher_base_url}`);
+    }
+  }
 
   /**
    * Save notebook metadata
