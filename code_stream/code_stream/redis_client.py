@@ -257,13 +257,101 @@ class RedisClient:
             result = list(cell_ids)
             logger.debug(f"Retrieved {len(result)} cell IDs for session={session_hash}")
             return result
-            
+
         except async_redis.RedisError as e:
             logger.error(f"Redis error retrieving cell IDs: {e}")
             return []
         except Exception as e:
             logger.error(f"Unexpected error retrieving cell IDs: {e}")
             return []
+
+    async def clear_all_data(self) -> int:
+        """
+        Clear all code_stream data from Redis.
+
+        Returns:
+            Number of keys deleted
+        """
+        try:
+            deleted_count = 0
+
+            # Use SCAN to find all code_stream keys
+            pattern = "cs:*"
+            cursor = 0
+            keys_to_delete = []
+
+            while True:
+                cursor, keys = await self.client.scan(cursor=cursor, match=pattern, count=100)
+                keys_to_delete.extend(keys)
+
+                if cursor == 0:
+                    break
+
+            # Delete all found keys
+            if keys_to_delete:
+                deleted_count = await self.client.delete(*keys_to_delete)
+
+            logger.info(f"Cleared all code_stream data: {deleted_count} keys deleted")
+            return deleted_count
+
+        except async_redis.RedisError as e:
+            logger.error(f"Redis error clearing all data: {e}")
+            return 0
+        except Exception as e:
+            logger.error(f"Unexpected error clearing all data: {e}")
+            return 0
+
+    async def cleanup_orphan_cells(self, session_hash: str, valid_cell_ids: List[str]) -> int:
+        """
+        Clean up orphan cells that exist in Redis but not in the notebook.
+
+        Args:
+            session_hash: Session identifier
+            valid_cell_ids: List of cell IDs currently in the notebook
+
+        Returns:
+            Number of orphan cells deleted
+        """
+        try:
+            deleted_count = 0
+
+            # Get all keys for this session
+            pattern = f"cs:{session_hash}:*"
+            cursor = 0
+            keys_to_check = []
+
+            while True:
+                cursor, keys = await self.client.scan(cursor=cursor, match=pattern, count=100)
+                keys_to_check.extend(keys)
+
+                if cursor == 0:
+                    break
+
+            # Check each key and delete if orphan
+            for key in keys_to_check:
+                try:
+                    data = await self.client.hgetall(key)
+                    cell_id = data.get(b'cell_id', b'').decode('utf-8')
+
+                    # If cell_id is not in valid_cell_ids, it's an orphan
+                    if cell_id and cell_id not in valid_cell_ids:
+                        await self.client.delete(key)
+                        deleted_count += 1
+                        logger.debug(f"Deleted orphan cell {cell_id} from session {session_hash}")
+
+                except Exception as e:
+                    logger.warning(f"Error processing key {key} during cleanup: {e}")
+                    continue
+
+            logger.info(f"Cleaned up {deleted_count} orphan cells from session {session_hash}")
+            return deleted_count
+
+        except async_redis.RedisError as e:
+            logger.error(f"Redis error cleaning up orphan cells: {e}")
+            return 0
+        except Exception as e:
+            logger.error(f"Unexpected error cleaning up orphan cells: {e}")
+            return 0
 
     async def close(self) -> None:
         """

@@ -50,9 +50,9 @@ export class SessionPanel extends Widget {
    */
   private _render(): void {
     if (this._roleManager.isTeacher()) {
-      this._renderTeacherView();
+      void this._renderTeacherView();
     } else {
-      this._renderStudentView();
+      void this._renderStudentView();
     }
   }
 
@@ -60,16 +60,58 @@ export class SessionPanel extends Widget {
    * Render teacher view
    * @private
    */
-  private _renderTeacherView(): void {
+  private async _renderTeacherView(): Promise<void> {
     let sessionHash = this._sessionManager.getSessionHash();
 
     console.log('Rendering teacher view with session hash:', sessionHash);
 
-    // If sessionHash is not available, try to fetch or wait for it
+    // Auto-create session if none exists
     if (!sessionHash) {
-      // Optionally, you can trigger a fetch or listen for sessionChanged event
-      // For now, just show 'Loading...' and re-render when sessionChanged fires
-      sessionHash = '';
+      // Show creating state
+      this.node.innerHTML = `
+        <div class="cs-session-panel-content">
+          <div class="cs-session-header">
+            <h3>Teacher Session</h3>
+          </div>
+          <div class="cs-session-code-section">
+            <label>Session Code</label>
+            <div class="cs-session-code-display">
+              <code class="cs-session-code">Creating session...</code>
+            </div>
+          </div>
+        </div>
+      `;
+
+      try {
+        // Create the session
+        sessionHash = await this._sessionManager.createSession();
+        console.log('Code Stream: Auto-created session:', sessionHash);
+        // sessionChanged signal will trigger _render automatically
+        return;
+      } catch (error) {
+        console.error('Code Stream: Failed to auto-create session:', error);
+        this.node.innerHTML = `
+          <div class="cs-session-panel-content">
+            <div class="cs-session-header">
+              <h3>Teacher Session</h3>
+            </div>
+            <div class="cs-session-code-section">
+              <label>Session Code</label>
+              <div class="cs-session-code-display">
+                <code class="cs-session-code cs-error">Failed to create session</code>
+                <button class="cs-retry-button" title="Retry">Retry</button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        // Setup retry button
+        const retryButton = this.node.querySelector('.cs-retry-button') as HTMLButtonElement;
+        if (retryButton) {
+          retryButton.addEventListener('click', () => void this._renderTeacherView());
+        }
+        return;
+      }
     }
 
     this.node.innerHTML = `
@@ -80,9 +122,9 @@ export class SessionPanel extends Widget {
         <div class="cs-session-code-section">
           <label>Session Code</label>
           <div class="cs-session-code-display">
-            <code class="cs-session-code">${sessionHash ? sessionHash : 'Loading...'}</code>
+            <code class="cs-session-code">${sessionHash}</code>
             <button class="cs-copy-button" title="Copy session code">Copy</button>
-            <button class="cs-refresh-button" title="Refresh session code">Refresh</button>
+            <button class="cs-refresh-button" title="Generate new session code">Refresh</button>
           </div>
           <p class="cs-session-hint">Share this code with students</p>
         </div>
@@ -239,6 +281,17 @@ export class SessionPanel extends Widget {
     const sessionHash = this._sessionManager.getSessionHash();
 
     if (!sessionHash) {
+      const copyButton = this.node.querySelector('.cs-copy-button') as HTMLButtonElement;
+      if (copyButton) {
+        const originalText = copyButton.textContent;
+        copyButton.textContent = 'No code!';
+        copyButton.classList.add('cs-copy-button-error');
+
+        setTimeout(() => {
+          copyButton.textContent = originalText;
+          copyButton.classList.remove('cs-copy-button-error');
+        }, 2000);
+      }
       return;
     }
 
@@ -270,10 +323,14 @@ export class SessionPanel extends Widget {
    * @private
    */
   private async _refreshSessionCode(): Promise<void> {
-    // Show confirmation dialog
-    const confirmed = window.confirm(
-      'Generate new session code? This will clear all shared cells and students must rejoin with the new code.'
-    );
+    const hasExistingSession = !!this._sessionManager.getSessionHash();
+
+    // Show appropriate confirmation dialog
+    const message = hasExistingSession
+      ? 'Generate new session code? This will clear all shared cells and students must rejoin with the new code.'
+      : 'Generate a new session code?';
+
+    const confirmed = window.confirm(message);
 
     if (!confirmed) {
       return;
